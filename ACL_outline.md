@@ -1,256 +1,160 @@
-Perfect — here’s a **comprehensive ACL-style survey paper outline** for your topic:
-🧠 **“Low-Resource and Multilingual Conversational AI: Challenges, Methods, and Future Directions”**
+# 🧠 **Low-Resource and Multilingual Conversational AI: Challenges, Methods, and Future Directions**
 
-It integrates your original structure plus all suggested enhancements — balanced for an **8-page ACL paper (+1 references)** with clear section numbering, subpoints, and suggested page allocation.
-
----
-
-# **Full Survey Paper Outline (ACL Format)**
+*(Revised Logical Flow — No Overlap Version)*
 
 ---
 
-### 🧭 **1. Abstract (150–200 words)**
+### **1. Abstract (150–200 words)**
 
-**Goal:** Concisely summarize motivation, scope, methods surveyed, and key open challenges.
-
-**Structure:**
-
-* Context: Importance of multilingual and low-resource conversational AI.
-* Scope: Models, datasets, transfer learning, evaluation, and safety.
-* Findings: Trends in multilingual instruction-tuning, low-resource adaptation, cultural grounding.
-* Closing: Roadmap for inclusive, culturally aware, and sustainable dialogue systems.
-
-*(Write last after full draft.)*
+Concise overview of motivation, scope, contributions, and key findings.
+*(Write last.)*
 
 ---
 
-### 🌍 **2. Introduction & Motivation (~1 page)**
+### **2. Introduction & Motivation (~1 page)**
 
-* Define **“low-resource”** (limited data, compute, script coverage) and **“multilingual”** in dialogue AI.
-* Contextualize inequality: 95%+ of world’s languages lack usable conversational datasets.
-* Implications for chatbots, virtual assistants, and educational systems.
-* Research evolution from monolingual → cross-lingual → multilingual dialogue systems.
-* **Contributions:**
-
-  1. Systematic synthesis of multilingual dialogue methods (2019–2025).
-  2. Taxonomy of cross-lingual transfer approaches.
-  3. Comparative analysis of multilingual datasets and evaluation.
-  4. Discussion on cultural alignment, safety, and sustainability.
+* Define *low-resource* and *multilingual* in dialogue AI.
+* Quantify global linguistic imbalance (95%+ underrepresented).
+* Impact on accessibility: assistants, education, civic tech.
+* Research evolution: monolingual → cross-lingual → multilingual → instruction-tuned LLMs.
+* **Contributions:** synthesis, taxonomy, evaluation comparison, cultural/safety insights.
 
 ---
 
-### 🧱 **3. Scope & Terminology Box (Optional Mini-Section)**
+### **3. Scope & Terminology Box (short boxed section)**
 
-*A short boxed paragraph or table.*
+Clarify:
 
-* Clarify distinctions: multilingual vs cross-lingual vs multi-dialectal.
-* Scope limits: focus on **text-based dialogue models** (task-oriented, chitchat, instruction-following).
-* Exclusions: full machine translation, ASR-only systems.
-* Definition criteria for “low-resource” (data size <100k dialogues, non-Latin scripts, etc.).
-
----
-
-### 🕰 **4. Related Surveys & Historical Context (0.5 page)**
-
-* Summarize prior surveys:
-
-  * Multilingual pretraining (Conneau & Lample, 2020).
-  * Low-resource NLP (Joshi et al., 2020).
-  * Code-switching (Khanuja et al., 2021).
-* Highlight what’s new: *focus on dialogue, instruction-tuned LLMs, and evaluation fairness.*
+* *Multilingual* vs *cross-lingual* vs *code-switched*.
+* Data vs compute scarcity.
+* Scope limited to text-based conversational systems (dialogue, chatbots, assistants).
 
 ---
 
-### 🔤 **5. Background: Foundations of Multilingual Representation (~1 page)** -- Stefanie
+### **4. Related Surveys & Historical Context (0.5 page)**
 
-* **Tokenization & Scripts:** multilingual vocabularies, subword vs byte-level, issues for agglutinative & non-Latin languages.
+Summarize prior reviews (multilingual NLP, low-resource MT, code-switching) and highlight novelty:
+
+> Focus on dialogue-centric multilinguality, instruction-tuned LLMs, and evaluation fairness.
+
+---
+
+### **5. Foundations of Multilingual Representation (~1 page)** -- Stefanie
+
+*(Technical groundwork only — no fairness overlap.)*
+
+* **Tokenization & Scripts:** subword, byte-level, and morphology issues in non-Latin languages.
 * **Pretraining Paradigms:**
 
   * Encoder: mBERT, XLM-R.
-  * Encoder–Decoder: mBART, mT5.
-  * Byte/character-level: ByT5.
-* **Comparative Analysis:** encoder vs seq2seq vs byte-level trade-offs.
-* **Figure:** taxonomy diagram of multilingual pretraining families.
-* **Note on Morphology:** handling rich morphology, segmentation variance.
+  * Encoder-decoder: mBART, mT5.
+  * Byte/char: ByT5.
+* **Learning Objectives:** MLM, TLM, contrastive alignment.
+* **Comparative Analysis:** encoder vs seq2seq vs byte-level.
+* **Figure:** taxonomy diagram of multilingual representation families.
+* End note: “These representations underpin all multilingual dialogue models explored next.”
 
 ---
 
-### 🗣️ **6. Multilingual & Low-Resource Dialogue Datasets (~1.5 pages)** -- Stefanie
+### **6. Multilingual & Low-Resource Dialogue Datasets (~1.5 pages)** -- Stefanie
 
-**6.1 Benchmark Overview (Table)**
-
-| Dataset              | Type            | #Langs | Domain     | Example Tasks       |
-| -------------------- | --------------- | ------ | ---------- | ------------------- |
-| MTOP                 | Task-oriented   | 11     | SLU        | Intent/slot parsing |
-| MASSIVE              | Task-oriented   | 51     | Alexa      | NLU                 |
-| XPersona             | Chitchat        | 4      | Persona    | Response gen        |
-| XDialog/XDailyDialog | General         | 7+     | Chitchat   | Gen                 |
-| GLUECoS              | Code-switch     | 2      | Multi-task | Classification      |
-| XTREME/XTREME-R      | Benchmark suite | 40–50  | Multi-task | Cross-lingual eval  |
-
-**6.2 Dataset Creation Paradigms:**
-
-* Translation-based vs community creation.
-* Synthetic augmentation (back-translation, paraphrasing).
-* Annotation cost and quality trade-offs.
-
-**6.3 Ethical & Sociolinguistic Dimensions:**
-
-* Participatory dataset collection (Masakhane, IndicNLP).
-* Indigenous data rights, privacy, and licensing.
-* Cultural representativeness and domain bias.
+* **Benchmark Overview Table** (MTOP, MASSIVE, XPersona, XDialog, GLUECoS, XTREME).
+* **Dataset Creation Pipelines:** translation-based, community-sourced, synthetic augmentation.
+* **Data Quality Challenges:** annotation consistency, script diversity.
+* **Ethical Dimensions:** participatory collection, indigenous rights, licensing, cultural representation.
 
 ---
 
-### ⚙️ **7. Techniques for Cross-Lingual Transfer (~1.5 pages)** -- Aditya
+### **7. Cross-Lingual Adaptation & Transfer Techniques (~1.5 pages)** -- Aditya
 
-**7.1 Fine-Tuning Strategies:**
+*(New merged + streamlined section replacing 7 & 8 overlap.)*
 
-* Translate-train, translate-test, zero-shot transfer.
-* Effects of translation noise and language distance.
-
-**7.2 Parameter-Efficient Adaptation:**
-
-* Adapters: MAD-X, BAD-X, MAD-G.
-* LoRA, prefix-tuning, soft prompts for multilingual adaptation.
-
-**7.3 Alignment & Representation Sharing:**
-
-* LASER, LaBSE, InfoXLM, VECO.
-* Alignment visualization (t-SNE multilingual embeddings).
-
-**7.4 Transfer Failure Analysis:**
-
-* Typological distance, script mismatch, cultural divergence.
-* Case studies (Arabic→Amharic, Hindi→Tamil).
+* **Fine-Tuning Strategies:** zero-shot, translate-train/test.
+* **Parameter-Efficient Adaptation:** Adapters (MAD-X, BAD-X), LoRA, prefix-tuning.
+* **Representation Alignment Methods:** LASER, LaBSE, InfoXLM.
+* **Failure Cases:** script mismatch, typological distance, translation noise.
+* **Mini-figure:** visualizing embedding overlap (t-SNE multilingual clusters).
 
 ---
 
-### 💬 **8. Conversational Models in Low-Resource Settings (~1 page)** -- Aditya
+### **8. Dialogue Modeling in Low-Resource Settings (~1 page)** -- Aditya
 
-**8.1 Dialogue-Specific Fine-Tuning:**
+*(Focus purely on dialogue; transfer techniques already covered above.)*
 
-* Cross-lingual training on mT5-Dialog, Poly-encoder, mDialoGPT.
-
-**8.2 Data Augmentation:**
-
-* Back-translation, paraphrasing, code-switch bootstrapping.
-
-**8.3 Code-Switch Handling:**
-
-* Language tags, mixed-vocab training, multilingual intent parsing.
-
-**8.4 Evaluation for Code-Mixed Dialogue:**
-
-* Metrics (slot accuracy, F1, BLEU).
-* Benchmarks: GLUECoS, LINCE, HinglishEval.
+* **Dialogue-Specific Fine-Tuning:** mT5-Dialog, Poly-encoder, mDialoGPT.
+* **Data Augmentation for Dialogue:** back-translation, paraphrasing, bootstrapping.
+* **Code-Switch & Mixed-Language Handling:** dynamic vocabularies, language tags.
+* **Evaluation for Dialogue:** slot accuracy, F1, BLEU, LINCE, GLUECoS benchmarks.
 
 ---
 
-### 🧩 **9. Instruction-Tuning & LLM-Era Multilingual Chatbots (~1.5 pages -- Ruhma
+### **9. Instruction-Tuning and the LLM Era (~1.5 pages)** -- Ruhma
 
-**9.1 Instruction-Tuned Models:**
-
-* BLOOMZ, mT0, mT5-XXL, Aya, Yi-Intl.
-* Benefits of small multilingual instruction datasets.
-
-**9.2 Multilingual Alignment Objectives:**
-
-* Preference tuning (Aya-Alignment, Cultural Reward Models).
-* Cross-lingual instruction datasets (Multi-Alpaca, Aya Collection).
-
-**9.3 Capabilities & Gaps:**
-
-* Zero-shot following in unseen languages.
-* Cultural adaptation and grounding.
-* Trade-off between coverage and quality.
+* **Multilingual Instruction Models:** BLOOMZ, mT0, mT5-XXL, Aya, Yi-Intl.
+* **Cross-Lingual Preference Alignment:** cultural reward models, Multi-Alpaca.
+* **Emergent Capabilities:** zero-shot generalization, unseen language following.
+* **Limitations:** cultural misalignment, evaluation bias, performance imbalance.
+* **Trend Synthesis Figure:** pre-LLM → instruction-tuned → alignment-tuned.
 
 ---
 
-### 🔈 **10. Speech & Multimodal Extensions (~1 page)** -- Ruhma
+### **10. Speech & Multimodal Extensions (~1 page)** -- Ruhma
 
-**10.1 Speech–Text Systems:**
-
-* Whisper, SeamlessM4T, NLLB-Speech.
-* Cross-lingual ASR and speech translation for assistants.
-
-**10.2 Vision–Language Systems:**
-
-* Multilingual visual captioning (Kosmos-2, Gemini 1.5 Pro).
-* Alignment of speech–text–vision modalities.
-
-**10.3 Evaluation Metrics:**
-
-* WER, BLEU, COMET-Kiwi, multimodal faithfulness.
+* **Speech–Text Integration:** Whisper, SeamlessM4T, NLLB-Speech.
+* **Vision–Language Expansion:** Kosmos-2, Gemini 1.5 Pro multilingual alignment.
+* **Evaluation Metrics:** WER, BLEU, COMET-Kiwi, multimodal faithfulness.
+* **Deployment Note:** on-device multilingual ASR/NLU efficiency.
 
 ---
 
-### ⚖️ **11. Evaluation, Fairness & Safety (~1.5 pages)** -- Isaac
+### **11. Evaluation, Fairness, and Safety (~1.5 pages)** -- Isaac
 
-**11.1 Benchmarks & Metrics:**
+*(Now clearly post-model section — behavioral analysis only.)*
 
-* XTREME, XSAFETY, Multi-HateCheck, XWinograd.
-* Beyond BLEU: toxicity, calibration, bias, value alignment.
+* **11.1 Evaluation Benchmarks & Metrics:** XTREME, XWinograd, XSAFETY, Multi-HateCheck.
 
-**11.2 Fairness & Bias Analysis:**
-
-* Gender, cultural, and religious bias in translations.
-* Offensive content detection across languages (Röttger et al. 2022, Salem et al. 2024).
-
-**11.3 Human Evaluation & Reproducibility:**
-
-* Cross-lingual rater bias and annotator fluency.
-* Crowdsourcing pitfalls and reproducibility checklists.
+  * Metrics: BLEU, COMET, BLEURT, toxicity, calibration, value alignment.
+* **11.2 Representation Fairness:** bias in embeddings (mBERT, XLM-R) across gender/religion.
+* **11.3 Human Evaluation:** cross-lingual rater effects, crowdsourcing pitfalls.
+* **11.4 Cultural & Safety Analysis:** hallucination, offensive generation, multilingual toxicity.
 
 ---
 
-### 🔮 **12. Open Challenges & Future Directions (~1 page)**  -- Isaac
+### **12. Open Challenges & Future Directions (~1 page)** -- Isaac
 
 * **Truly Low-Resource Languages:** orthography, scriptless dialects.
-* **Multimodal Alignment Gaps:** speech-vision-text fusion.
-* **Evaluation Leakage:** overlap in pretraining corpora.
-* **Cultural Grounding:** participatory data design, value diversity.
-* **Sustainability:** compute and energy footprint for multilingual models.
+* **Evaluation Leakage:** pretraining data contamination.
+* **Cultural Grounding:** participatory data design, localized value alignment.
+* **Sustainability:** compute/energy fairness.
+* **Green Multilingual AI:** compression, low-compute adaptation.
 
 ---
 
-### 🌐 **13. Societal Impact & Policy Considerations (~0.5 page)**  -- Isaac
+### **13. Societal Impact, Policy, and Accessibility (~0.5 page)** -- Isaac
 
-* Community initiatives: Masakhane, BigScience, IndicNLP.
-* Policy & inclusion: UN SDGs, digital divide.
-* Role of open-source multilingual LLMs in accessibility and education.
-
----
-
-### 📚 **14. Conclusion (~0.5 page)**
-
-* Restate motivation: inclusivity, fairness, linguistic diversity.
-* Recap findings: datasets, methods, evaluation, ethics.
-* Forward-looking roadmap: *lighter models + richer data + participatory evaluation.*
+* **Community Initiatives:** Masakhane, BigScience, IndicNLP.
+* **Policy Angle:** digital divide, UN SDGs, language preservation.
+* **Equitable Access:** open-source multilingual models for education, health, and government.
 
 ---
 
-### 📝 **15. References**
+### **14. Discussion & Synthesis (~0.5 page)**
 
-* Use ACL style (natbib or biblatex with `acl_natbib.bst`).
-* Maintain `.bib` entries categorized (Datasets, Models, Evaluation, Ethics).
-
----
-
-✅ **Approximate Page Allocation (8-page main body)**
-
-| Section   | Pages        |
-| --------- | ------------ |
-| 1–4       | 1.0          |
-| 5–6       | 1.5          |
-| 7         | 1.5          |
-| 8         | 1.0          |
-| 9         | 1.5          |
-| 10        | 1.0          |
-| 11        | 1.5          |
-| 12–14     | 1.0          |
-| **Total** | **~8 pages** |
+* Connect trends: *representation → transfer → instruction → alignment*.
+* Visual summary: timeline or conceptual map (2019–2025).
+* Highlight emerging paradigm: *from data scarcity → cultural alignment.*
 
 ---
 
-Would you like me to create a **LaTeX ACL template version** of this outline next (with `\section{}` and placeholder text for each part)? It’ll give you a ready-to-fill scaffold in Overleaf.
+### **15. Conclusion (~0.5 page)**
+
+* Reiterate inclusivity and linguistic diversity goals.
+* Summarize findings: data, models, fairness, sustainability.
+* End with call for participatory, lightweight, and culturally grounded multilingual AI.
+
+---
+
+### **16. References**
+
+Standard ACL style (`acl_natbib.bst`).
+
