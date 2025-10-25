@@ -83,7 +83,7 @@ Clarify definitions and boundaries:
 
 ---
 
-### **8. Dialogue Modeling in Low-Resource Settings (~1 page)**
+### **8. Dialogue Modeling in Low-Resource Settings (~1 page)** -- Ruhma
 
 * **Dialogue-Specific Fine-Tuning:** mT5-Dialog, Poly-encoder, mDialoGPT.
 * **Data Augmentation:** back-translation, paraphrasing, cross-lingual bootstrapping.
@@ -92,7 +92,7 @@ Clarify definitions and boundaries:
 
 ---
 
-### **9. Instruction-Tuning & LLM-Era Multilingual Chatbots (~1.5 pages)**
+### **9. Instruction-Tuning & LLM-Era Multilingual Chatbots (~1.5 pages)** -- Ruhma
 
 * **Instruction-Tuned Models:** BLOOMZ, mT0, mT5-XXL, Aya, Yi-Intl.
 * **Preference & Cultural Alignment:** Aya-Alignment, Multi-Alpaca.
