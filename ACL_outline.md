@@ -61,7 +61,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🔤 **5. Background: Foundations of Multilingual Representation (~1 page)**
+### 🔤 **5. Background: Foundations of Multilingual Representation (~1 page)** -- Stefanie
 
 * **Tokenization & Scripts:** multilingual vocabularies, subword vs byte-level, issues for agglutinative & non-Latin languages.
 * **Pretraining Paradigms:**
@@ -75,7 +75,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🗣️ **6. Multilingual & Low-Resource Dialogue Datasets (~1.5 pages)**
+### 🗣️ **6. Multilingual & Low-Resource Dialogue Datasets (~1.5 pages)** -- Stefanie
 
 **6.1 Benchmark Overview (Table)**
 
@@ -102,7 +102,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### ⚙️ **7. Techniques for Cross-Lingual Transfer (~1.5 pages)**
+### ⚙️ **7. Techniques for Cross-Lingual Transfer (~1.5 pages)** -- Aditya
 
 **7.1 Fine-Tuning Strategies:**
 
@@ -126,7 +126,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 💬 **8. Conversational Models in Low-Resource Settings (~1 page)**
+### 💬 **8. Conversational Models in Low-Resource Settings (~1 page)** -- Aditya
 
 **8.1 Dialogue-Specific Fine-Tuning:**
 
@@ -147,7 +147,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🧩 **9. Instruction-Tuning & LLM-Era Multilingual Chatbots (~1.5 pages)**
+### 🧩 **9. Instruction-Tuning & LLM-Era Multilingual Chatbots (~1.5 pages -- Ruhma
 
 **9.1 Instruction-Tuned Models:**
 
@@ -167,7 +167,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🔈 **10. Speech & Multimodal Extensions (~1 page)**
+### 🔈 **10. Speech & Multimodal Extensions (~1 page)** -- Ruhma
 
 **10.1 Speech–Text Systems:**
 
@@ -185,7 +185,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### ⚖️ **11. Evaluation, Fairness & Safety (~1.5 pages)**
+### ⚖️ **11. Evaluation, Fairness & Safety (~1.5 pages)** -- Isaac
 
 **11.1 Benchmarks & Metrics:**
 
@@ -204,7 +204,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🔮 **12. Open Challenges & Future Directions (~1 page)**
+### 🔮 **12. Open Challenges & Future Directions (~1 page)**  -- Isaac
 
 * **Truly Low-Resource Languages:** orthography, scriptless dialects.
 * **Multimodal Alignment Gaps:** speech-vision-text fusion.
@@ -214,7 +214,7 @@ It integrates your original structure plus all suggested enhancements — balanc
 
 ---
 
-### 🌐 **13. Societal Impact & Policy Considerations (~0.5 page)**
+### 🌐 **13. Societal Impact & Policy Considerations (~0.5 page)**  -- Isaac
 
 * Community initiatives: Masakhane, BigScience, IndicNLP.
 * Policy & inclusion: UN SDGs, digital divide.
