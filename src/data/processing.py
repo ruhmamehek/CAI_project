@@ -6,11 +6,34 @@ from typing import List, Dict
 from transformers import AutoTokenizer
 import logging
 
+from .cleaning import SECFilingCleaner
+
 logger = logging.getLogger(__name__)
 
 
 class DocumentProcessor:
     """Process raw documents (SEC filings, FOMC texts) into text."""
+    
+    def __init__(
+        self,
+        min_chunk_length: int = 50,
+        remove_xbrl: bool = True,
+        remove_metadata: bool = True,
+        remove_boilerplate: bool = True
+    ):
+        """
+        Args:
+            min_chunk_length: Minimum character length for chunks to keep
+            remove_xbrl: Whether to remove XBRL/XML structured data
+            remove_metadata: Whether to remove filing metadata sections
+            remove_boilerplate: Whether to remove common boilerplate text
+        """
+        self.cleaner = SECFilingCleaner(
+            min_chunk_length=min_chunk_length,
+            remove_xbrl=remove_xbrl,
+            remove_metadata=remove_metadata,
+            remove_boilerplate=remove_boilerplate
+        )
     
     def parse_sec_filing(self, file_path: Path) -> str:
         """
@@ -25,10 +48,7 @@ class DocumentProcessor:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
         
-        # Remove HTML tags and normalize whitespace
-        text = re.sub(r'<[^>]+>', '', content)
-        text = re.sub(r'\s+', ' ', text)
-        
+        text = self.cleaner.clean_text(content)
         return text
     
     def parse_fomc_text(self, file_path: Path) -> str:
@@ -65,18 +85,22 @@ class Chunker:
         self.chunk_overlap = chunk_overlap
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         
-    def chunk_text(self, text: str, doc_id: str) -> List[Dict[str, any]]:
+    def chunk_text(self, text: str, doc_id: str, filter_chunks: bool = True) -> List[Dict[str, any]]:
         """
         Chunk text into overlapping segments.
         
         Args:
             text: Input text
             doc_id: Document identifier
+            filter_chunks: Whether to filter out low-quality chunks
             
         Returns:
             List of chunks with metadata
         """
-        # Split text into sentences first to avoid tokenizing huge texts at once
+        if not text or len(text.strip()) < 50:
+            logger.warning(f"Skipping {doc_id}: text too short after cleaning")
+            return []
+        
         sentences = re.split(r'(?<=[.!?])\s+', text)
         
         chunks = []
@@ -86,7 +110,9 @@ class Chunker:
         token_count = 0
         
         for sentence in sentences:
-            # Tokenize sentence individually (with truncation to avoid warnings)
+            if not sentence.strip():
+                continue
+                
             sentence_tokens = self.tokenizer.encode(
                 sentence, 
                 add_special_tokens=False, 
@@ -95,23 +121,19 @@ class Chunker:
             )
             sentence_token_count = len(sentence_tokens)
             
-            # If adding this sentence would exceed chunk size, save current chunk
             if token_count + sentence_token_count > self.chunk_size and current_chunk_sentences:
-                # Create chunk from current sentences
                 chunk_text = ' '.join(current_chunk_sentences)
                 chunks.append({
                     "text": chunk_text,
                     "doc_id": doc_id,
                     "chunk_id": f"{doc_id}_chunk_{len(chunks)}",
-                    "start_token": 0,  # Simplified - not tracking exact positions
+                    "start_token": 0,
                     "end_token": token_count
                 })
                 
-                # Start new chunk with overlap (keep last few sentences)
                 overlap_sentences = []
                 overlap_count = 0
                 
-                # Keep sentences that fit in overlap
                 for sent in reversed(current_chunk_sentences):
                     sent_tokens = self.tokenizer.encode(
                         sent, 
@@ -128,11 +150,9 @@ class Chunker:
                 current_chunk_sentences = overlap_sentences
                 token_count = overlap_count
             
-            # Add sentence to current chunk
             current_chunk_sentences.append(sentence)
             token_count += sentence_token_count
         
-        # Add final chunk if any remaining
         if current_chunk_sentences:
             chunk_text = ' '.join(current_chunk_sentences)
             chunks.append({
@@ -142,5 +162,10 @@ class Chunker:
                 "start_token": 0,
                 "end_token": token_count
             })
+        
+        if filter_chunks and chunks:
+            from .cleaning import SECFilingCleaner
+            cleaner = SECFilingCleaner(min_chunk_length=50)
+            chunks = cleaner.filter_chunks(chunks)
             
         return chunks
