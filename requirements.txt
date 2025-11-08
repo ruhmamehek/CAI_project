@@ -2,8 +2,6 @@
 torch>=2.0.0
 transformers>=4.35.0
 sentence-transformers>=2.2.0
-faiss-cpu>=1.7.4  # Use faiss-gpu if GPU available
-
 # Data processing
 pandas>=2.0.0
 beautifulsoup4>=4.12.0

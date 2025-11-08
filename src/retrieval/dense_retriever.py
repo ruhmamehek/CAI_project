@@ -11,6 +11,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Check if FAISS GPU is available
+try:
+    _ = faiss.StandardGpuResources
+    FAISS_GPU_AVAILABLE = True
+except AttributeError:
+    FAISS_GPU_AVAILABLE = False
+
 
 def get_device(device_preference: str = "auto") -> str:
     """Get the best available device."""
@@ -30,15 +37,18 @@ class DenseRetriever:
     def __init__(
         self,
         model_name: str = "BAAI/bge-base-en-v1.5",
-        device: str = "auto"
+        device: str = "auto",
+        use_faiss_gpu: bool = True
     ):
         """
         Args:
             model_name: Sentence transformer model name
             device: Device to run model on ("auto", "cuda", "mps", or "cpu")
+            use_faiss_gpu: Whether to use GPU for FAISS operations (if available)
         """
         self.model_name = model_name
         self.device = get_device(device)
+        self.use_faiss_gpu = use_faiss_gpu and (self.device == "cuda") and FAISS_GPU_AVAILABLE
         logger.info(f"Using device: {self.device}")
         self.encoder = SentenceTransformer(model_name, device=self.device)
         self.index = None
@@ -58,9 +68,11 @@ class DenseRetriever:
         
         # Encode chunks
         logger.info("Encoding chunks...")
+        # Increase batch size for better GPU utilization
+        batch_size = 128 if self.device == "cuda" else 32
         embeddings = self.encoder.encode(
             texts,
-            batch_size=32,
+            batch_size=batch_size,
             show_progress_bar=True,
             convert_to_numpy=True
         )
@@ -70,7 +82,32 @@ class DenseRetriever:
         
         # Create FAISS index
         dimension = embeddings.shape[1]
-        self.index = faiss.IndexFlatIP(dimension)  # Inner product for normalized vectors
+        n_vectors = len(embeddings)
+        
+        # Use approximate index (IVF) for to save space and improve speed
+        use_ivf = n_vectors > 10000
+        if use_ivf:
+            n_clusters = min(256, int(n_vectors ** 0.5))  # Adaptive clustering
+            quantizer = faiss.IndexFlatIP(dimension)
+            cpu_index = faiss.IndexIVFFlat(quantizer, dimension, n_clusters)
+            cpu_index.nprobe = 10  # Search in 10 nearest clusters
+            logger.info(f"Using approximate index (IVF) with {n_clusters} clusters")
+            # Train IVF index before adding vectors
+            logger.info("Training IVF index...")
+            cpu_index.train(embeddings.astype('float32'))
+        else:
+            cpu_index = faiss.IndexFlatIP(dimension)
+            logger.info("Using exact index (IndexFlatIP)")
+        
+        if self.use_faiss_gpu:
+            try:
+                gpu_resource = faiss.StandardGpuResources()
+                self.index = faiss.index_cpu_to_gpu(gpu_resource, 0, cpu_index)
+            except Exception:
+                self.index = cpu_index
+        else:
+            self.index = cpu_index
+            
         self.index.add(embeddings.astype('float32'))
         
         logger.info(f"Index built with {self.index.ntotal} vectors")
@@ -110,12 +147,21 @@ class DenseRetriever:
         return results
     
     def save_index(self, index_dir: str):
-        """Save index and metadata to disk."""
+        """Save index and metadata to disk.
+        
+        Note: FAISS can only save CPU indices, so GPU indices are converted to CPU first.
+        """
         index_path = Path(index_dir)
         index_path.mkdir(parents=True, exist_ok=True)
         
-        # Save FAISS index
-        faiss.write_index(self.index, str(index_path / "index.faiss"))
+        # FAISS write_index only works with CPU indices
+        try:
+            cpu_index = faiss.index_gpu_to_cpu(self.index)
+        except (AttributeError, RuntimeError):
+            # Already a CPU index
+            cpu_index = self.index
+            
+        faiss.write_index(cpu_index, str(index_path / "index.faiss"))
         
         # Save chunks metadata
         with open(index_path / "chunks.json", "w") as f:
@@ -127,10 +173,17 @@ class DenseRetriever:
         """Load index and metadata from disk."""
         index_path = Path(index_dir)
         
-        # Load FAISS index
-        self.index = faiss.read_index(str(index_path / "index.faiss"))
+        cpu_index = faiss.read_index(str(index_path / "index.faiss"))
         
-        # Load chunks metadata
+        if self.use_faiss_gpu:
+            try:
+                gpu_resource = faiss.StandardGpuResources()
+                self.index = faiss.index_cpu_to_gpu(gpu_resource, 0, cpu_index)
+            except Exception:
+                self.index = cpu_index
+        else:
+            self.index = cpu_index
+        
         with open(index_path / "chunks.json", "r") as f:
             self.chunks = json.load(f)
         
