@@ -76,22 +76,71 @@ class Chunker:
         Returns:
             List of chunks with metadata
         """
-        tokens = self.tokenizer.encode(text, add_special_tokens=False)
+        # Split text into sentences first to avoid tokenizing huge texts at once
+        sentences = re.split(r'(?<=[.!?])\s+', text)
         
         chunks = []
         overlap_tokens = int(self.chunk_size * self.chunk_overlap)
-        step_size = self.chunk_size - overlap_tokens
         
-        for i in range(0, len(tokens), step_size):
-            chunk_tokens = tokens[i:i + self.chunk_size]
-            chunk_text = self.tokenizer.decode(chunk_tokens, skip_special_tokens=True)
+        current_chunk_sentences = []
+        token_count = 0
+        
+        for sentence in sentences:
+            # Tokenize sentence individually (with truncation to avoid warnings)
+            sentence_tokens = self.tokenizer.encode(
+                sentence, 
+                add_special_tokens=False, 
+                truncation=True, 
+                max_length=1024
+            )
+            sentence_token_count = len(sentence_tokens)
             
+            # If adding this sentence would exceed chunk size, save current chunk
+            if token_count + sentence_token_count > self.chunk_size and current_chunk_sentences:
+                # Create chunk from current sentences
+                chunk_text = ' '.join(current_chunk_sentences)
+                chunks.append({
+                    "text": chunk_text,
+                    "doc_id": doc_id,
+                    "chunk_id": f"{doc_id}_chunk_{len(chunks)}",
+                    "start_token": 0,  # Simplified - not tracking exact positions
+                    "end_token": token_count
+                })
+                
+                # Start new chunk with overlap (keep last few sentences)
+                overlap_sentences = []
+                overlap_count = 0
+                
+                # Keep sentences that fit in overlap
+                for sent in reversed(current_chunk_sentences):
+                    sent_tokens = self.tokenizer.encode(
+                        sent, 
+                        add_special_tokens=False, 
+                        truncation=True, 
+                        max_length=1024
+                    )
+                    if overlap_count + len(sent_tokens) <= overlap_tokens:
+                        overlap_sentences.insert(0, sent)
+                        overlap_count += len(sent_tokens)
+                    else:
+                        break
+                
+                current_chunk_sentences = overlap_sentences
+                token_count = overlap_count
+            
+            # Add sentence to current chunk
+            current_chunk_sentences.append(sentence)
+            token_count += sentence_token_count
+        
+        # Add final chunk if any remaining
+        if current_chunk_sentences:
+            chunk_text = ' '.join(current_chunk_sentences)
             chunks.append({
                 "text": chunk_text,
                 "doc_id": doc_id,
                 "chunk_id": f"{doc_id}_chunk_{len(chunks)}",
-                "start_token": i,
-                "end_token": min(i + self.chunk_size, len(tokens))
+                "start_token": 0,
+                "end_token": token_count
             })
             
         return chunks
