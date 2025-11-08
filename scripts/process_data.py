@@ -32,18 +32,22 @@ def process_sec_filings(raw_dir: Path, processed_dir: Path, config: dict):
         chunk_overlap=config["data"]["chunk_overlap"]
     )
     
-    sec_dir = raw_dir / "sec"
+    # Files are in data/sec-edgar-filings
+    sec_dir = raw_dir.parent / "sec-edgar-filings"
+    
     if not sec_dir.exists():
-        logger.warning(f"SEC directory not found: {sec_dir}")
+        logger.warning(f"SEC filings directory not found: {sec_dir}")
+        logger.info("Expected location: data/sec-edgar-filings")
         return
     
     all_chunks = []
     
-    # Process each filing
-    for filing_file in sec_dir.rglob("*.txt"):
-        logger.info(f"Processing {filing_file.name}")
+    # Process each filing (look for full-submission.txt files)
+    for filing_file in sec_dir.rglob("full-submission.txt"):
+        logger.info(f"Processing {filing_file.relative_to(sec_dir)}")
         text = processor.parse_sec_filing(filing_file)
-        doc_id = filing_file.stem
+        # Use the filing directory name as doc_id for uniqueness
+        doc_id = filing_file.parent.name
         chunks = chunker.chunk_text(text, doc_id)
         all_chunks.extend(chunks)
     
@@ -84,8 +88,8 @@ def main():
             )
         
         # Download FOMC texts
-        fomc_downloader = FOMCDownloader(str(raw_dir / "fomc"))
-        fomc_downloader.download_fomc_texts(config["data"]["fomc"]["years"])
+    logger.info("FOMC texts not  yet")   
+    # !!!!! TO DO:
     
     # Process documents
     process_sec_filings(raw_dir, processed_dir, config)

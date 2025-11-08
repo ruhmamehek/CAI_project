@@ -18,9 +18,9 @@ class SECFilingDownloader:
             output_dir: Directory to save filings
             email: Email for SEC EDGAR 
         """
-        self.output_dir = Path(output_dir)
+        self.output_dir = Path(output_dir).resolve() 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.downloader = Downloader(output_dir, email)
+        self.downloader = Downloader(str(self.output_dir), email)
         
     def download_filings(
         self,
