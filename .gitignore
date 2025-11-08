@@ -24,3 +24,8 @@ Thumbs.db
 # Project specific
 *.pyc
 
+# Large data files (generate/download on PACE)
+data/processed/sec_chunks.json
+data/indices/
+data/sec-edgar-filings/
+
