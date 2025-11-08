@@ -21,6 +21,26 @@ def load_config(config_path: str):
         return yaml.safe_load(f)
 
 
+def group_chunks_by_metadata(chunks):
+    """Group chunks by ticker and year."""
+    grouped = {}
+    for chunk in chunks:
+        ticker = chunk.get("ticker")
+        year = chunk.get("year")
+        
+        if not ticker:
+            ticker = "unknown"
+        if not year:
+            year = "unknown"
+        
+        key = (ticker, year)
+        if key not in grouped:
+            grouped[key] = []
+        grouped[key].append(chunk)
+    
+    return grouped
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build FAISS index from chunks")
     parser.add_argument("--config", type=str, default="config.yaml", help="Config file")
@@ -30,7 +50,6 @@ def main():
     
     config = load_config(args.config)
     
-    # Get paths from config if not provided
     chunks_file = args.chunks_file or Path(config["data"]["processed_dir"]) / "sec_chunks.json"
     output_dir = args.output_dir or config.get("data", {}).get("index_dir", "data/indices")
     
@@ -39,28 +58,44 @@ def main():
         logger.error(f"Chunks file not found: {chunks_file}")
         return
     
-    # Load chunks
     logger.info(f"Loading chunks from {chunks_file}...")
     with open(chunks_file, 'r') as f:
         chunks = json.load(f)
     
     logger.info(f"Loaded {len(chunks)} chunks")
     
-    # Initialize retriever
+    grouped_chunks = group_chunks_by_metadata(chunks)
+    logger.info(f"Grouped into {len(grouped_chunks)} company/year combinations")
+    
     model_name = config.get("retrieval", {}).get("dense", {}).get("model_name", "BAAI/bge-base-en-v1.5")
     device = config.get("device", "cuda")
     
     retriever = DenseRetriever(model_name=model_name, device=device)
     
-    # Build index
-    retriever.build_index(chunks)
+    index_info = {}
     
-    # Save index
-    retriever.save_index(output_dir)
+    for (ticker, year), group_chunks in grouped_chunks.items():
+        logger.info(f"Building index for {ticker}/{year} ({len(group_chunks)} chunks)...")
+        
+        retriever.build_index(group_chunks)
+        
+        index_path = Path(output_dir) / str(ticker) / str(year)
+        retriever.save_index(str(index_path))
+        
+        index_info[f"{ticker}/{year}"] = {
+            "ticker": ticker,
+            "year": year,
+            "num_chunks": len(group_chunks),
+            "path": str(index_path)
+        }
     
-    logger.info("Index building complete!")
+    index_manifest = Path(output_dir) / "index_manifest.json"
+    with open(index_manifest, 'w') as f:
+        json.dump(index_info, f, indent=2)
+    
+    logger.info(f"Index building complete! Created {len(grouped_chunks)} indices")
+    logger.info(f"Index manifest saved to {index_manifest}")
 
 
 if __name__ == "__main__":
     main()
-

@@ -11,7 +11,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Check if FAISS GPU is available
 try:
     _ = faiss.StandardGpuResources
     FAISS_GPU_AVAILABLE = True
@@ -66,9 +65,7 @@ class DenseRetriever:
         self.chunks = chunks
         texts = [chunk["text"] for chunk in chunks]
         
-        # Encode chunks
         logger.info("Encoding chunks...")
-        # Increase batch size for better GPU utilization
         batch_size = 128 if self.device == "cuda" else 32
         embeddings = self.encoder.encode(
             texts,
@@ -77,22 +74,18 @@ class DenseRetriever:
             convert_to_numpy=True
         )
         
-        # Normalize for cosine similarity
         faiss.normalize_L2(embeddings)
         
-        # Create FAISS index
         dimension = embeddings.shape[1]
         n_vectors = len(embeddings)
         
-        # Use approximate index (IVF) for to save space and improve speed
         use_ivf = n_vectors > 10000
         if use_ivf:
-            n_clusters = min(256, int(n_vectors ** 0.5))  # Adaptive clustering
+            n_clusters = min(256, int(n_vectors ** 0.5))
             quantizer = faiss.IndexFlatIP(dimension)
             cpu_index = faiss.IndexIVFFlat(quantizer, dimension, n_clusters)
-            cpu_index.nprobe = 10  # Search in 10 nearest clusters
+            cpu_index.nprobe = 10
             logger.info(f"Using approximate index (IVF) with {n_clusters} clusters")
-            # Train IVF index before adding vectors
             logger.info("Training IVF index...")
             cpu_index.train(embeddings.astype('float32'))
         else:
@@ -109,16 +102,21 @@ class DenseRetriever:
             self.index = cpu_index
             
         self.index.add(embeddings.astype('float32'))
-        
         logger.info(f"Index built with {self.index.ntotal} vectors")
     
-    def retrieve(self, query: str, top_k: int = 20) -> List[Dict[str, any]]:
+    def retrieve(
+        self, 
+        query: str, 
+        top_k: int = 20,
+        filter_metadata: Dict = None
+    ) -> List[Dict[str, any]]:
         """
-        Retrieve top-k chunks for query.
+        Retrieve top-k chunks for query with optional metadata filtering.
         
         Args:
             query: Query text
             top_k: Number of chunks to retrieve
+            filter_metadata: Dict of metadata filters (e.g., {"ticker": "AAPL", "year": 2023})
             
         Returns:
             List of retrieved chunks with scores
@@ -126,44 +124,47 @@ class DenseRetriever:
         if self.index is None:
             raise ValueError("Index not built. Call build_index() first.")
         
-        # Encode query
-        query_embedding = self.encoder.encode(
-            [query],
-            convert_to_numpy=True
-        )
+        query_embedding = self.encoder.encode([query], convert_to_numpy=True)
         faiss.normalize_L2(query_embedding)
         
-        # Search
-        scores, indices = self.index.search(query_embedding.astype('float32'), top_k)
+        search_k = top_k * 5 if filter_metadata else top_k
+        scores, indices = self.index.search(query_embedding.astype('float32'), search_k)
         
-        # Format results
         results = []
         for score, idx in zip(scores[0], indices[0]):
-            if idx < len(self.chunks):
-                chunk = self.chunks[idx].copy()
-                chunk["score"] = float(score)
-                results.append(chunk)
+            if idx >= len(self.chunks):
+                continue
+                
+            chunk = self.chunks[idx].copy()
+            
+            if filter_metadata:
+                matches = all(
+                    chunk.get(key) == value 
+                    for key, value in filter_metadata.items()
+                )
+                if not matches:
+                    continue
+            
+            chunk["score"] = float(score)
+            results.append(chunk)
+            
+            if len(results) >= top_k:
+                break
         
         return results
     
     def save_index(self, index_dir: str):
-        """Save index and metadata to disk.
-        
-        Note: FAISS can only save CPU indices, so GPU indices are converted to CPU first.
-        """
+        """Save index and metadata to disk."""
         index_path = Path(index_dir)
         index_path.mkdir(parents=True, exist_ok=True)
         
-        # FAISS write_index only works with CPU indices
         try:
             cpu_index = faiss.index_gpu_to_cpu(self.index)
         except (AttributeError, RuntimeError):
-            # Already a CPU index
             cpu_index = self.index
             
         faiss.write_index(cpu_index, str(index_path / "index.faiss"))
         
-        # Save chunks metadata
         with open(index_path / "chunks.json", "w") as f:
             json.dump(self.chunks, f, indent=2)
         
@@ -188,4 +189,3 @@ class DenseRetriever:
             self.chunks = json.load(f)
         
         logger.info(f"Index loaded from {index_path} with {self.index.ntotal} vectors")
-

@@ -48,8 +48,7 @@ class DocumentProcessor:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
         
-        text = self.cleaner.clean_text(content)
-        return text
+        return self.cleaner.clean_text(content)
     
     def parse_fomc_text(self, file_path: Path) -> str:
         """
@@ -61,7 +60,6 @@ class DocumentProcessor:
         Returns:
             Extracted text content
         """
-        # TODO: Implement FOMC text parsing (may need PyPDF2 for PDFs)
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             return f.read()
 
@@ -85,13 +83,20 @@ class Chunker:
         self.chunk_overlap = chunk_overlap
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
         
-    def chunk_text(self, text: str, doc_id: str, filter_chunks: bool = True) -> List[Dict[str, any]]:
+    def chunk_text(
+        self, 
+        text: str, 
+        doc_id: str, 
+        metadata: Dict = None,
+        filter_chunks: bool = True
+    ) -> List[Dict[str, any]]:
         """
         Chunk text into overlapping segments.
         
         Args:
             text: Input text
             doc_id: Document identifier
+            metadata: Additional metadata (ticker, filing_type, year, etc.)
             filter_chunks: Whether to filter out low-quality chunks
             
         Returns:
@@ -123,13 +128,16 @@ class Chunker:
             
             if token_count + sentence_token_count > self.chunk_size and current_chunk_sentences:
                 chunk_text = ' '.join(current_chunk_sentences)
-                chunks.append({
+                chunk_data = {
                     "text": chunk_text,
                     "doc_id": doc_id,
                     "chunk_id": f"{doc_id}_chunk_{len(chunks)}",
                     "start_token": 0,
                     "end_token": token_count
-                })
+                }
+                if metadata:
+                    chunk_data.update(metadata)
+                chunks.append(chunk_data)
                 
                 overlap_sentences = []
                 overlap_count = 0
@@ -155,13 +163,16 @@ class Chunker:
         
         if current_chunk_sentences:
             chunk_text = ' '.join(current_chunk_sentences)
-            chunks.append({
+            chunk_data = {
                 "text": chunk_text,
                 "doc_id": doc_id,
                 "chunk_id": f"{doc_id}_chunk_{len(chunks)}",
                 "start_token": 0,
                 "end_token": token_count
-            })
+            }
+            if metadata:
+                chunk_data.update(metadata)
+            chunks.append(chunk_data)
         
         if filter_chunks and chunks:
             from .cleaning import SECFilingCleaner
