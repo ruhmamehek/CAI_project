@@ -1,0 +1,16 @@
+# Core dependencies
+torch>=2.0.0
+transformers>=4.35.0
+sentence-transformers>=2.2.0
+
+# Data processing
+pandas>=2.0.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+requests>=2.31.0
+sec-edgar-downloader>=4.0.0
+PyPDF2>=3.0.0
+
+# Utilities
+pyyaml>=6.0
+tqdm>=4.66.0
