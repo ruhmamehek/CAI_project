@@ -42,19 +42,21 @@ python scripts/process_data.py --config config.yaml --download
 
 ### Step 2: Process and Chunk Documents
 
-Process raw filings into chunks:
+Process raw filings into narrative chunks and extract tables:
 
 ```bash
 python scripts/process_data.py --config config.yaml
 ```
 
 **What it does:**
-- Parses SEC filing HTML/XML to extract text
-- Chunks documents into overlapping segments (400 tokens, 30% overlap)
-- Saves processed chunks to `data/processed/sec_chunks.json`
+- Parses SEC filing HTML/XML with a section-aware preprocessor derived from Unstructured’s SEC pipeline
+- Separates narrative text from tabular content
+- Chunks narrative sections into overlapping segments (configurable size/overlap)
+- Saves clean text chunks and structured tables to `data/processed/`
 
 **Output:**
-- `data/processed/sec_chunks.json` - All chunks with metadata
+- `data/processed/sec_chunks.json` — Narrative chunks with section metadata
+- `data/processed/sec_tables.json` — Extracted tables (plain text plus HTML when available)
 
 ### Step 3: Build FAISS Index
 
@@ -100,4 +102,9 @@ python scripts/build_index.py --config config.yaml
 - [ ] Implement generation pipeline with citations
 - [ ] Add NLI verification layer
 - [ ] Build evaluation framework
+
+## Attribution
+
+Portions of the SEC parsing utilities in `src/prepline_sec_filings/` are adapted from [Unstructured-IO/pipeline-sec-filings](https://github.com/Unstructured-IO/pipeline-sec-filings) (commit `babc6430e36c76c21a9c963ceda4867c9b5d28a9`), released under the Apache License 2.0.  
+Our preprocessing approach is informed by the section-aware pipeline described in *A Scalable Data-Driven Framework for Systematic Analysis of SEC 10-K Filings Using Large Language Models* ([arXiv:2409.17581](https://arxiv.org/abs/2409.17581)).
 
