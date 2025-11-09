@@ -19,7 +19,7 @@ data:
     
   # Chunking
   chunk_size: 800
-    chunk_overlap: 0.2
+  chunk_overlap: 0.2
 
 # Retrieval
 retrieval:
