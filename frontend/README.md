@@ -1,188 +1,154 @@
 # SEC Filings QA Frontend
 
-Vue.js 3 frontend for the SEC Filings QA System built with Vite.
+Vue.js frontend for the SEC Filings Question-Answering system.
 
-## Prerequisites
+## Quick Start
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Backend service running (see `backend/qa/README.md`)
+### Option 1: Docker (Recommended)
 
-## Setup
+1. **Start the frontend container:**
+   ```bash
+   docker compose up -d
+   ```
+
+2. **Access the application:**
+   - Frontend: `http://localhost:3000`
+   - Backend: `http://localhost:8000` (must be running separately)
+
+3. **View logs:**
+   ```bash
+   docker compose logs -f
+   ```
+
+4. **Stop the container:**
+   ```bash
+   docker compose down
+   ```
+
+### Option 2: Local Development
 
 1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Start the development server:**
+2. **Start development server:**
    ```bash
    npm run dev
    ```
-   The frontend will be available at `http://localhost:8080`
 
-3. **Build for production:**
+3. **Access the application:**
+   - Frontend: `http://localhost:8080` (Vite default port)
+   - Backend: `http://localhost:8000` (must be running)
+
+4. **Build for production:**
    ```bash
    npm run build
    ```
-   The built files will be in the `dist` directory.
 
-4. **Preview production build:**
+5. **Preview production build:**
    ```bash
    npm run preview
    ```
+
+## Prerequisites
+
+- **Backend Service**: The QA backend must be running on `http://localhost:8000`
+  - See `../backend/qa/README.md` for backend setup instructions
+
+## Configuration
+
+### API URL
+
+The frontend connects to the backend API. By default, it uses:
+- `http://localhost:8000` (works for both Docker and local dev)
+
+You can override this by setting the `VITE_API_URL` environment variable during build:
+```bash
+VITE_API_URL=http://your-backend-url:8000 npm run build
+```
+
+### Docker Configuration
+
+The Docker setup:
+- Builds the Vue.js app using `npm run build`
+- Serves the production build using `npm run preview`
+- Exposes the frontend on port `3000`
+- Uses `extra_hosts` to access host's localhost (for backend communication)
 
 ## Project Structure
 
 ```
 frontend/
 ├── src/
+│   ├── App.vue           # Main application component
+│   ├── main.js           # Application entry point
 │   ├── assets/
-│   │   └── style.css          # Global styles
-│   ├── components/
-│   │   ├── QueryForm.vue      # Query form component
-│   │   └── Results.vue        # Results display component
-│   ├── App.vue                # Main app component
-│   └── main.js                # Entry point
-├── index.html                 # HTML template
-├── vite.config.js            # Vite configuration
-├── package.json              # Dependencies and scripts
-└── README.md                 # This file
+│   │   └── style.css     # Global styles
+│   └── components/
+│       ├── QueryForm.vue # Query input form
+│       └── Results.vue   # Results display
+├── index.html            # HTML template
+├── vite.config.js        # Vite configuration
+├── package.json          # Dependencies and scripts
+├── Dockerfile            # Docker build configuration
+└── docker-compose.yml    # Docker Compose configuration
 ```
 
-## Configuration
+## Available Scripts
 
-### API URL
+- `npm run dev` - Start development server with hot-reload
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build locally
 
-The frontend connects to the backend API. By default, it's set to `http://localhost:8000`.
+## Docker Commands
 
-To change the API URL, edit `src/App.vue`:
+```bash
+# Build and start
+docker compose up -d
 
-```javascript
-data() {
-  return {
-    apiUrl: 'http://localhost:8000'  // Change this to your backend URL
-  }
-}
-```
+# Rebuild after changes
+docker compose up --build -d
 
-### Vite Proxy
+# View logs
+docker compose logs -f frontend
 
-The `vite.config.js` includes a proxy configuration for development. If you want to use the proxy instead of direct API calls, you can modify the API calls to use `/api` prefix.
+# Stop
+docker compose down
 
-## Usage
-
-1. **Enter your question** in the textarea
-2. **Optionally set filters:**
-   - **Ticker**: Filter by company (AAPL, MSFT, GOOGL)
-   - **Year**: Filter by year (2022, 2023, 2024)
-   - **Filing Type**: Filter by filing type (10-K, 10-Q)
-   - **Top K**: Number of chunks to retrieve (default: 20)
-3. **Click "Submit Query"**
-4. **View results:**
-   - **Answer**: Generated answer from the RAG system
-   - **Sources**: List of source documents with metadata and relevance scores
-
-## Development
-
-### Adding New Components
-
-1. Create a new `.vue` file in `src/components/`
-2. Import and use it in `App.vue` or other components
-
-Example:
-```vue
-<template>
-  <MyComponent />
-</template>
-
-<script>
-import MyComponent from './components/MyComponent.vue'
-
-export default {
-  components: {
-    MyComponent
-  }
-}
-</script>
-```
-
-### Styling
-
-- Global styles are in `src/assets/style.css`
-- Component-specific styles can be added in the `<style>` section of each `.vue` file
-- Scoped styles can be used with `<style scoped>`
-
-## API Integration
-
-The frontend makes POST requests to:
-- `POST /query` - Submit queries and get answers
-
-Request format:
-```json
-{
-  "query": "What was Apple's revenue in 2023?",
-  "filters": {
-    "ticker": "AAPL",
-    "year": "2023"
-  },
-  "top_k": 20
-}
-```
-
-Response format:
-```json
-{
-  "answer": "...",
-  "sources": [
-    {
-      "ticker": "AAPL",
-      "filing_type": "10-K",
-      "year": "2023",
-      "accession_number": "...",
-      "score": 0.85,
-      "chunk_id": "..."
-    }
-  ],
-  "num_chunks_retrieved": 5
-}
+# Remove container and volumes
+docker compose down -v
 ```
 
 ## Troubleshooting
 
+### Backend Connection Issues
+
+If the frontend can't connect to the backend:
+1. Ensure the backend is running on `http://localhost:8000`
+2. Check backend logs: `docker compose logs -f` (in backend/qa directory)
+3. Verify backend health: `curl http://localhost:8000/health`
+
+### Port Already in Use
+
+If port 3000 is already in use:
+- **Docker**: Change the port mapping in `docker-compose.yml`:
+  ```yaml
+  ports:
+    - "3001:3000"  # Use port 3001 instead
+  ```
+- **Local**: Vite will automatically use the next available port
+
 ### CORS Errors
-- CORS is enabled in the backend Flask service
-- Verify backend is running on the correct port (default: 8000)
-- Check that `flask-cors` is installed in the backend
 
-### API Connection Errors
-- Check that backend is running on the correct port
-- Verify API URL in `src/App.vue`
-- Check browser console for detailed errors
+If you see CORS errors, ensure:
+- Backend has CORS enabled (should be configured in `qa_service.py`)
+- You're using the correct backend URL
 
-### Build Errors
-- Ensure all dependencies are installed: `npm install`
-- Check Node.js version (v16 or higher required)
-- Clear node_modules and reinstall: `rm -rf node_modules && npm install`
+## Development Notes
 
-## Production Deployment
+- The frontend uses Vue 3 with Composition API
+- Styling uses a dark theme (see `src/assets/style.css`)
+- API communication is handled in `App.vue` component
+- The app automatically detects the environment and uses the appropriate API URL
 
-1. **Build the project:**
-   ```bash
-   npm run build
-   ```
-
-2. **Serve the `dist` directory:**
-   - Use a static file server (nginx, Apache, etc.)
-   - Or use a hosting service (Vercel, Netlify, etc.)
-
-3. **Configure API URL:**
-   - Update `apiUrl` in `src/App.vue` to your production API URL
-   - Or use environment variables for configuration
-
-## Technologies
-
-- **Vue.js 3**: Progressive JavaScript framework
-- **Vite**: Next-generation frontend build tool
-- **JavaScript**: ES6+ features
-- **CSS3**: Modern styling with gradients and animations

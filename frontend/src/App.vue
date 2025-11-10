@@ -46,11 +46,14 @@ export default {
     Results
   },
   data() {
+    // Use environment variable or default to localhost:8000
+    // In Docker, backend is exposed on host's localhost:8000
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     return {
       loading: false,
       error: null,
       result: null,
-      apiUrl: 'http://localhost:8000'
+      apiUrl: apiUrl
     }
   },
   methods: {

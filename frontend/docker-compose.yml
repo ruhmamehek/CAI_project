@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sec-filings-frontend
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "localhost:host-gateway"
+    restart: unless-stopped
+
