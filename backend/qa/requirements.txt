@@ -1,0 +1,13 @@
+# Vector database
+chromadb==1.3.4  # ChromaDB version 1.3.4
+
+# Web service
+flask
+flask-cors  # Enable CORS for frontend communication
+python-dotenv
+
+# LLM providers (choose one or more)
+google-generativeai
+
+# for reranking
+sentence_transformers

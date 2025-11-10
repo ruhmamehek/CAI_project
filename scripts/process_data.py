@@ -61,7 +61,8 @@ def process_sec_filings(raw_dir: Path, processed_dir: Path, config: dict):
     processor = DocumentProcessor()
     chunker = Chunker(
         chunk_size=config["data"]["chunk_size"],
-        chunk_overlap=config["data"]["chunk_overlap"]
+        chunk_overlap=config["data"]["chunk_overlap"],
+        max_chunk_bytes=config["data"].get("max_chunk_bytes", 16384)
     )
     
     sec_dir = raw_dir.parent / "sec-edgar-filings"

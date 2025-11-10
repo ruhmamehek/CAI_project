@@ -10,6 +10,14 @@ venv/
 env/
 ENV/
 
+# Environment variables (ignores .env files in all directories)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
 # IDE
 .vscode/
 .idea/
@@ -28,4 +36,16 @@ Thumbs.db
 data/processed/sec_chunks.json
 data/indices/
 data/sec-edgar-filings/
+
+# Node.js (for frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
 
