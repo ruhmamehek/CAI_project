@@ -1,0 +1,9 @@
+# Retrieval
+retrieval:
+  dense:
+    model_name: "BAAI/bge-base-en-v1.5"
+    top_k: 20
+  
+reranking:
+  enable: true
+  max_length: 512
