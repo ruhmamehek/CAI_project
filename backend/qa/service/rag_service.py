@@ -99,6 +99,7 @@ class RAGService:
         max_length = max_context_length or self.config.max_context_length
         
         # Build context from chunks
+        logger.info(f"Building context from {len(chunks)} chunks")
         context = self.prompt_builder.build_context(chunks, max_length=max_length)
         
         # Build prompt
@@ -173,9 +174,11 @@ class RAGService:
         """
         # Retrieve relevant chunks
         chunks = self.retrieve(query, top_k=top_k, filters=filters)
-        
+        logger.info(f"Retrieved {len(chunks)} chunks")
+
         # Rerank chunks
-        chunks = self.rerank_chunks(query, chunks, top_k=top_k)
+        chunks = self.rerank_chunks(query, chunks, top_k=10)
+        logger.info(f"Reranked {len(chunks)} chunks")
 
         # Generate response
         answer = self.generate_response(query, chunks)

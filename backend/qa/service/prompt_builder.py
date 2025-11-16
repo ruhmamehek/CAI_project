@@ -12,7 +12,7 @@ class PromptBuilder:
     SYSTEM_PROMPT = "You are a helpful financial analyst assistant."
     
     @staticmethod
-    def build_context(chunks: List[Chunk], max_length: int = 4000) -> str:
+    def build_context(chunks: List[Chunk], max_length: int = 50000) -> str:
         """
         Build context string from chunks.
         
@@ -27,7 +27,7 @@ class PromptBuilder:
         separator = "\n\n"
         separator_length = len(separator)
         current_length = 0
-        
+        logger.info(f"Given chunks are: {chunks}")
         for chunk in chunks:
             chunk_text = chunk.text
             metadata = chunk.metadata or {}
@@ -70,7 +70,6 @@ class PromptBuilder:
                 current_length = total_length
         
         context = separator.join(context_parts)
-        logger.info(f"Built context: {context}")
         return context
     
     @staticmethod

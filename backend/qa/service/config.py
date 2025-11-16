@@ -87,7 +87,7 @@ class RAGConfig:
     chroma: ChromaDBConfig
     llm: LLMConfig
     top_k: int = 20
-    max_context_length: int = 4000
+    max_context_length: int = 50000
     rerank_max_length: int = 512  # Max length for cross-encoder reranking (512, 1024, etc.)
     enable_reranking: bool = True  # Whether to enable reranking
     
