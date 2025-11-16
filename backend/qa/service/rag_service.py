@@ -177,7 +177,7 @@ class RAGService:
         logger.info(f"Retrieved {len(chunks)} chunks")
 
         # Rerank chunks
-        chunks = self.rerank_chunks(query, chunks, top_k=10)
+        chunks = self.rerank_chunks(query, chunks, top_k=18)
         logger.info(f"Reranked {len(chunks)} chunks")
 
         # Generate response

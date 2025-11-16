@@ -17,6 +17,7 @@
             <span class="source-ticker">{{ source.ticker }}</span>
             <span class="source-filing">{{ source.filing_type }}</span>
             <span class="source-year">{{ source.year }}</span>
+            <span class="source-chunk-id">{{ source.chunk_id }}</span>
             <span class="source-score">Score: {{ source.score.toFixed(3) }}</span>
           </div>
           <div class="source-details">

@@ -46,19 +46,29 @@ class LLMConfig:
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     temperature: float = 0.1
-    max_tokens: int = 1000
+    max_tokens: Optional[int] = None  # None means no limit (model's maximum)
     
     @classmethod
     def from_env(cls) -> 'LLMConfig':
         """Create LLMConfig from environment variables."""
         provider = os.getenv('LLM_PROVIDER', 'openai').lower()
         model = os.getenv('LLM_MODEL', 'gpt-4o-mini')
+        # If LLM_MAX_TOKENS is not set or empty, use None (no limit)
+        max_tokens_str = os.getenv('LLM_MAX_TOKENS', '').strip()
+        max_tokens = int(max_tokens_str) if max_tokens_str else None
+        temperature = float(os.getenv('LLM_TEMPERATURE', '0.1'))
         
         if provider == "gemini":
             api_key = os.getenv('GEMINI_API_KEY')
             if not api_key:
                 raise ValueError("GEMINI_API_KEY not set")
-            return cls(provider=provider, model=model, api_key=api_key)
+            return cls(
+                provider=provider,
+                model=model,
+                api_key=api_key,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
 
         # elif provider == "openai":
         #     api_key = os.getenv('OPENAI_API_KEY')
@@ -115,12 +125,25 @@ class RAGConfig:
         rerank_max_length = rerank_config.get('max_length', int(os.getenv('RERANK_MAX_LENGTH', '512')))
         enable_reranking = rerank_config.get('enable', os.getenv('ENABLE_RERANKING', 'false').lower() == 'true')
         
+        # Get LLM settings from config file (with fallback to env vars)
+        llm_config = yaml_config.get('llm', {})
+        # If max_tokens is None, empty, or not specified, allow unlimited (None)
+        llm_max_tokens_raw = llm_config.get('max_tokens', os.getenv('LLM_MAX_TOKENS', '').strip())
+        if llm_max_tokens_raw is None or (isinstance(llm_max_tokens_raw, str) and not llm_max_tokens_raw.strip()):
+            llm_max_tokens = None
+        else:
+            llm_max_tokens = int(llm_max_tokens_raw)
+        llm_temperature = llm_config.get('temperature', float(os.getenv('LLM_TEMPERATURE', '0.1')))
+        
         # Create config objects
         chroma = ChromaDBConfig.from_env(
             collection_name="sec_filings",
             embedding_model=embedding_model
         )
         llm = LLMConfig.from_env()
+        # Override max_tokens and temperature if specified in config file
+        llm.max_tokens = llm_max_tokens
+        llm.temperature = llm_temperature
         
         return cls(
             chroma=chroma,

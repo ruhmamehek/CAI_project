@@ -34,9 +34,10 @@ class PromptBuilder:
             ticker = metadata.get('ticker', 'Unknown')
             year = metadata.get('year', 'Unknown')
             filing_type = metadata.get('filing_type', 'Unknown')
+            chunk_id = chunk.chunk_id
             
             # Format chunk with metadata
-            header = f"[Source: {ticker} {filing_type} {year}]\n"
+            header = f"[Source: {ticker} {filing_type} {year}, chunk_id: {chunk_id}]\n"
             chunk_with_meta = header + chunk_text
             chunk_length = len(chunk_with_meta)
             
@@ -97,6 +98,15 @@ Instructions:
 - Cite specific sources (ticker, filing type, year) when referencing information
 - Be concise and accurate
 - Use professional financial terminology
+
+IMPORTANT:
+For all information presented in your answer that is drawn from a chunk, cite the chunk from which the information was derived by creating tags around the information. 
+
+Each chunk will have a source header that looks like this:[Source: AAPL 10-K 2023, chunk_id: 1234567890]
+
+For example, if the information is from the 2023 10-K of Apple Inc., the tag should be:
+<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
+
 
 Answer:"""
     

@@ -7,3 +7,6 @@ retrieval:
 reranking:
   enable: true
   max_length: 512
+
+llm:
+  max_tokens: 16384
