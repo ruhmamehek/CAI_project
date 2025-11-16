@@ -87,6 +87,7 @@ def process_sec_filings(raw_dir: Path, processed_dir: Path, config: dict):
         try:
             narrative_sections, tables, item_sections = preprocessor.parse_file(
                 file_path=str(filing_file),
+                
                 doc_id=doc_id,
             )
         except Exception as exc:
