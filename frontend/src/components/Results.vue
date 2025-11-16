@@ -23,14 +23,31 @@
           class="source-item"
         >
           <div class="source-header">
-            <span class="source-ticker">{{ source.ticker }}</span>
-            <span class="source-filing">{{ source.filing_type }}</span>
-            <span class="source-year">{{ source.year }}</span>
-            <span class="source-chunk-id">{{ source.chunk_id }}</span>
-            <span class="source-score">Score: {{ source.score.toFixed(3) }}</span>
+            <div class="source-header-left">
+              <span class="source-ticker">{{ source.ticker }}</span>
+              <span class="source-filing">{{ source.filing_type }}</span>
+              <span class="source-year">{{ source.year }}</span>
+              <span class="source-chunk-id">{{ source.chunk_id }}</span>
+              <span class="source-score">Score: {{ source.score.toFixed(3) }}</span>
+            </div>
+            <button 
+              v-if="source.text"
+              @click="toggleSource(index)"
+              class="source-expand-btn"
+              :aria-expanded="isExpanded(index)"
+              :title="isExpanded(index) ? 'Hide source text' : 'Show source text'"
+            >
+              <span class="expand-icon" :class="{ 'expanded': isExpanded(index) }">▼</span>
+            </button>
           </div>
           <div class="source-details">
             <small>Accession: {{ source.accession_number }}</small>
+          </div>
+          <div 
+            v-if="source.text && isExpanded(index)" 
+            class="source-text-content"
+          >
+            <div class="source-text">{{ source.text }}</div>
           </div>
         </div>
       </div>
@@ -54,7 +71,8 @@ export default {
         text: '',
         x: 0,
         y: 0
-      }
+      },
+      expandedSources: new Set()  // Track which sources are expanded
     }
   },
   computed: {
@@ -142,6 +160,16 @@ export default {
     },
     hideTooltip() {
       this.tooltip.visible = false
+    },
+    toggleSource(index) {
+      if (this.expandedSources.has(index)) {
+        this.expandedSources.delete(index)
+      } else {
+        this.expandedSources.add(index)
+      }
+    },
+    isExpanded(index) {
+      return this.expandedSources.has(index)
     },
     attachTooltipListeners() {
       if (!this.$refs.answerContent) return
