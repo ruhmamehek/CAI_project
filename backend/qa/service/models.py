@@ -13,6 +13,7 @@ class Source:
     accession_number: str
     score: float
     chunk_id: str
+    text: Optional[str] = None  # Optional chunk text content
 
 
 @dataclass
@@ -56,7 +57,8 @@ class QueryResponse:
                     "year": source.year,
                     "accession_number": source.accession_number,
                     "score": source.score,
-                    "chunk_id": source.chunk_id
+                    "chunk_id": source.chunk_id,
+                    "text": source.text
                 }
                 for source in self.sources
             ],
@@ -84,6 +86,7 @@ class Chunk:
             year=metadata.get('year', 'Unknown'),
             accession_number=metadata.get('accession_number', 'Unknown'),
             score=self.score,
-            chunk_id=self.chunk_id
+            chunk_id=self.chunk_id,
+            text=self.text
         )
 
