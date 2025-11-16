@@ -243,6 +243,44 @@ main {
     font-weight: 600;
 }
 
+/* Source Highlight Styling */
+.source-highlight {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    position: relative;
+}
+
+.source-highlight:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Custom Tooltip */
+.custom-tooltip {
+    position: fixed;
+    background: #1e293b;
+    color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    border: 1px solid #475569;
+    z-index: 10000;
+    pointer-events: none;
+    max-width: 400px;
+    white-space: normal;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
 .answer-content {
     font-size: 1.1rem;
     line-height: 1.7;
@@ -312,6 +350,15 @@ main {
 
 .source-year {
     background: #10b981;
+    color: #ffffff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.source-chunk-id {
+    background: #64748b;
     color: #ffffff;
     padding: 0.25rem 0.75rem;
     border-radius: 4px;
