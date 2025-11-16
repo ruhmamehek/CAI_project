@@ -43,10 +43,11 @@ class QueryResponse:
     answer: str
     sources: List[Source]
     num_chunks_retrieved: int
+    verification: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "answer": self.answer,
             "sources": [
                 {
@@ -61,6 +62,9 @@ class QueryResponse:
             ],
             "num_chunks_retrieved": self.num_chunks_retrieved
         }
+        if self.verification:
+            result["verification"] = self.verification
+        return result
 
 
 @dataclass

@@ -10,3 +10,7 @@ reranking:
 
 llm:
   max_tokens: 16384
+
+# Verification
+verification:
+  enable: true

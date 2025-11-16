@@ -65,11 +65,15 @@ def query():
         query_request = QueryRequest.from_dict(data)
         query_request.validate()
         
+        # Check if verification should be enabled (default: True)
+        enable_verification = data.get('enable_verification', True)
+        
         # Execute RAG pipeline
         response = rag_service.query(
             query=query_request.query,
             filters=query_request.filters,
-            top_k=query_request.top_k
+            top_k=query_request.top_k,
+            enable_verification=enable_verification
         )
         
         return jsonify(response.to_dict())
