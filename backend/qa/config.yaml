@@ -7,3 +7,7 @@ retrieval:
 reranking:
   enable: true
   max_length: 512
+
+# Verification
+verification:
+  enable: true

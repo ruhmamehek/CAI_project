@@ -90,6 +90,7 @@ class RAGConfig:
     max_context_length: int = 4000
     rerank_max_length: int = 512  # Max length for cross-encoder reranking (512, 1024, etc.)
     enable_reranking: bool = True  # Whether to enable reranking
+    enable_verification: bool = True  # Whether to enable verification
     
     @classmethod
     def from_file(cls, config_path: str = "config.yaml") -> 'RAGConfig':
@@ -115,6 +116,10 @@ class RAGConfig:
         rerank_max_length = rerank_config.get('max_length', int(os.getenv('RERANK_MAX_LENGTH', '512')))
         enable_reranking = rerank_config.get('enable', os.getenv('ENABLE_RERANKING', 'false').lower() == 'true')
         
+        # Get verification settings
+        verification_config = yaml_config.get('verification', {})
+        enable_verification = verification_config.get('enable', os.getenv('ENABLE_VERIFICATION', 'true').lower() == 'true')
+        
         # Create config objects
         chroma = ChromaDBConfig.from_env(
             collection_name="sec_filings",
@@ -127,7 +132,8 @@ class RAGConfig:
             llm=llm,
             top_k=top_k,
             rerank_max_length=rerank_max_length,
-            enable_reranking=enable_reranking
+            enable_reranking=enable_reranking,
+            enable_verification=enable_verification
         )
     
     @classmethod
@@ -138,13 +144,15 @@ class RAGConfig:
         top_k = int(os.getenv('RAG_TOP_K', '20'))
         rerank_max_length = int(os.getenv('RERANK_MAX_LENGTH', '512'))
         enable_reranking = os.getenv('ENABLE_RERANKING', 'true').lower() == 'true'
+        enable_verification = os.getenv('ENABLE_VERIFICATION', 'true').lower() == 'true'
         
         return cls(
             chroma=chroma,
             llm=llm,
             top_k=top_k,
             rerank_max_length=rerank_max_length,
-            enable_reranking=enable_reranking
+            enable_reranking=enable_reranking,
+            enable_verification=enable_verification
         )
 
 

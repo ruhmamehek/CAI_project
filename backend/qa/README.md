@@ -82,6 +82,7 @@ RAG-powered question-answering service for SEC filings using ChromaDB and LLMs.
 - `RAG_TOP_K` - Number of chunks to retrieve (default: 20)
 - `RERANK_MAX_LENGTH` - Max length for reranking (default: 512)
 - `ENABLE_RERANKING` - Enable reranking (default: true)
+- `ENABLE_VERIFICATION` - Enable verification (default: true)
 
 ### Config File
 
@@ -109,6 +110,48 @@ curl -X POST http://localhost:8000/query \
   }'
 ```
 
+### Example Query with Verification
+
+The verification system is enabled by default. The response will include a `verification` object:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What was Apple revenue in 2023?",
+    "filters": {"ticker": "AAPL", "year": "2023"},
+    "top_k": 10,
+    "enable_verification": true
+  }'
+```
+
+Response includes verification results:
+```json
+{
+  "answer": "...",
+  "sources": [...],
+  "verification": {
+    "overall_score": 0.85,
+    "answer_source_alignment": 0.90,
+    "citation_coverage": 0.75,
+    "fact_verification_score": 0.80,
+    "issues": [],
+    "verified_sources": ["chunk_id_1", "chunk_id_2"],
+    "unverified_claims": []
+  }
+}
+```
+
+To disable verification for a specific request:
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What was Apple revenue in 2023?",
+    "enable_verification": false
+  }'
+```
+
 ## Docker Commands
 
 ```bash
@@ -128,6 +171,56 @@ docker compose up --build -d
 curl http://localhost:8000/health
 ```
 
+## Testing Verification
+
+### Automated Test Script
+
+Run the verification test script to verify the system is working:
+
+```bash
+# Install requests if needed
+pip install requests
+
+# Run the test script
+python test_verification.py
+```
+
+The script will:
+- Check that the service is running
+- Verify that verification results are included in responses
+- Test that verification can be disabled
+- Validate that scores are in the correct range [0.0, 1.0]
+
+### Manual Testing
+
+1. **Start the service** (if not already running):
+   ```bash
+   python qa_service.py
+   # or
+   docker compose up -d
+   ```
+
+2. **Make a query and check for verification**:
+   ```bash
+   curl -X POST http://localhost:5000/query \
+     -H "Content-Type: application/json" \
+     -d '{"query": "What was Apple revenue in 2023?"}' | jq '.verification'
+   ```
+
+3. **What to look for**:
+   - `verification` object should be present in the response
+   - `overall_score` should be between 0.0 and 1.0
+   - `answer_source_alignment`, `citation_coverage`, and `fact_verification_score` should all be present
+   - `issues` array may contain warnings if verification finds problems
+   - `verified_sources` should list chunk IDs that support the answer
+   - `unverified_claims` should list any claims that couldn't be verified
+
+4. **Check service logs** for verification activity:
+   ```bash
+   # Look for log messages like:
+   # "Verification completed. Overall score: 0.85"
+   ```
+
 ## Troubleshooting
 
 ### Docker credential helper error
@@ -140,3 +233,10 @@ cat > ~/.docker/config.json << EOF
 }
 EOF
 ```
+
+### Verification not appearing in responses
+
+1. **Check configuration**: Ensure `verification.enable: true` in `config.yaml` or `ENABLE_VERIFICATION=true` in environment
+2. **Check logs**: Look for verification errors in the service logs
+3. **Test with explicit flag**: Set `"enable_verification": true` in the request body
+4. **Check LLM availability**: Verification uses the LLM, so ensure your LLM API key is valid
