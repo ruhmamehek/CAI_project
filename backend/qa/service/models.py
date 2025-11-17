@@ -13,6 +13,7 @@ class Source:
     accession_number: str
     score: float
     chunk_id: str
+    text: Optional[str] = None  # Optional chunk text content
 
 
 @dataclass
@@ -43,10 +44,11 @@ class QueryResponse:
     answer: str
     sources: List[Source]
     num_chunks_retrieved: int
+    verification: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "answer": self.answer,
             "sources": [
                 {
@@ -55,12 +57,16 @@ class QueryResponse:
                     "year": source.year,
                     "accession_number": source.accession_number,
                     "score": source.score,
-                    "chunk_id": source.chunk_id
+                    "chunk_id": source.chunk_id,
+                    "text": source.text
                 }
                 for source in self.sources
             ],
             "num_chunks_retrieved": self.num_chunks_retrieved
         }
+        if self.verification:
+            result["verification"] = self.verification
+        return result
 
 
 @dataclass
@@ -80,6 +86,7 @@ class Chunk:
             year=metadata.get('year', 'Unknown'),
             accession_number=metadata.get('accession_number', 'Unknown'),
             score=self.score,
-            chunk_id=self.chunk_id
+            chunk_id=self.chunk_id,
+            text=self.text
         )
 

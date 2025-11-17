@@ -59,13 +59,17 @@ class GeminiClient(LLMClient):
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
         
+        # Build generation config - only include max_output_tokens if specified
+        generation_config = {
+            "temperature": self.temperature,
+        }
+        if self.max_tokens is not None:
+            generation_config["max_output_tokens"] = self.max_tokens
+        
         # Generate content using Gemini
         model = self.genai.GenerativeModel(
             model_name=self.model,
-            generation_config={
-                "temperature": self.temperature,
-                "max_output_tokens": self.max_tokens,
-            }
+            generation_config=generation_config
         )
         
         response = model.generate_content(full_prompt)

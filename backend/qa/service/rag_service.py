@@ -10,6 +10,7 @@ from .llm_client import LLMClient, create_llm_client
 from .prompt_builder import PromptBuilder
 from .models import QueryRequest, QueryResponse, Chunk
 from .config import RAGConfig
+from .verification import RAGVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,9 @@ class RAGService:
         self.retriever = ChromaDBRetriever(config.chroma)
         self.llm_client = create_llm_client(config.llm)
         self.prompt_builder = PromptBuilder()
+        
+        # Initialize verification
+        self.verifier = RAGVerifier(self.llm_client)
         
         # Initialize reranking models (optional, lazy loading)
         self.bi_encoder = None
@@ -99,6 +103,7 @@ class RAGService:
         max_length = max_context_length or self.config.max_context_length
         
         # Build context from chunks
+        logger.info(f"Building context from {len(chunks)} chunks")
         context = self.prompt_builder.build_context(chunks, max_length=max_length)
         
         # Build prompt
@@ -158,7 +163,8 @@ class RAGService:
         self,
         query: str,
         filters: Optional[Dict[str, Any]] = None,
-        top_k: Optional[int] = None
+        top_k: Optional[int] = None,
+        enable_verification: bool = True
     ) -> QueryResponse:
         """
         Complete RAG pipeline: retrieve and generate response.
@@ -167,15 +173,18 @@ class RAGService:
             query: User query
             filters: Metadata filters for retrieval
             top_k: Number of chunks to retrieve
+            enable_verification: Whether to perform verification (default: True)
             
         Returns:
             QueryResponse with answer, sources, and metadata
         """
         # Retrieve relevant chunks
         chunks = self.retrieve(query, top_k=top_k, filters=filters)
-        
+        logger.info(f"Retrieved {len(chunks)} chunks")
+
         # Rerank chunks
-        chunks = self.rerank_chunks(query, chunks, top_k=top_k)
+        chunks = self.rerank_chunks(query, chunks, top_k=18)
+        logger.info(f"Reranked {len(chunks)} chunks")
 
         # Generate response
         answer = self.generate_response(query, chunks)
@@ -183,10 +192,22 @@ class RAGService:
         # Extract source information
         sources = [chunk.to_source() for chunk in chunks]
         
+        # Perform verification if enabled
+        verification_result = None
+        if enable_verification and self.config.enable_verification:
+            try:
+                verification = self.verifier.verify(answer, chunks, query)
+                verification_result = verification.to_dict()
+                logger.info(f"Verification completed. Overall score: {verification.overall_score:.2f}")
+            except Exception as e:
+                logger.warning(f"Verification failed: {e}", exc_info=True)
+                # Continue without verification rather than failing the entire request
+        
         return QueryResponse(
             answer=answer,
             sources=sources,
-            num_chunks_retrieved=len(chunks)
+            num_chunks_retrieved=len(chunks),
+            verification=verification_result
         )
     
     def get_collection_info(self) -> Dict[str, Any]:
