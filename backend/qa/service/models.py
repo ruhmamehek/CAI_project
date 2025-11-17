@@ -8,7 +8,7 @@ from dataclasses import dataclass
 class Source:
     """Source information for a retrieved chunk."""
     ticker: str
-    filing_type: str
+    # filing_type: str
     year: str
     accession_number: str
     score: float
@@ -53,7 +53,7 @@ class QueryResponse:
             "sources": [
                 {
                     "ticker": source.ticker,
-                    "filing_type": source.filing_type,
+                    # "filing_type": source.filing_type,
                     "year": source.year,
                     "accession_number": source.accession_number,
                     "score": source.score,
@@ -82,7 +82,7 @@ class Chunk:
         metadata = self.metadata or {}
         return Source(
             ticker=metadata.get('ticker', 'Unknown'),
-            filing_type=metadata.get('filing_type', 'Unknown'),
+            # filing_type=metadata.get('filing_type', 'Unknown'),
             year=metadata.get('year', 'Unknown'),
             accession_number=metadata.get('accession_number', 'Unknown'),
             score=self.score,

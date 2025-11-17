@@ -33,11 +33,12 @@ class PromptBuilder:
             metadata = chunk.metadata or {}
             ticker = metadata.get('ticker', 'Unknown')
             year = metadata.get('year', 'Unknown')
-            filing_type = metadata.get('filing_type', 'Unknown')
+            # filing_type = metadata.get('filing_type', 'Unknown')
             chunk_id = chunk.chunk_id
             
             # Format chunk with metadata
-            header = f"[Source: {ticker} {filing_type} {year}, chunk_id: {chunk_id}]\n"
+            # header = f"[Source: {ticker} {filing_type} {year}, chunk_id: {chunk_id}]\n"
+            header = f"[Source: {ticker} {year}, chunk_id: {chunk_id}]\n"
             chunk_with_meta = header + chunk_text
             chunk_length = len(chunk_with_meta)
             
