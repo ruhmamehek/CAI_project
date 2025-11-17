@@ -84,7 +84,7 @@ def upload_to_chromadb(
         metadata = {
             "doc_id": chunk.get("doc_id", ""),
             "ticker": chunk.get("ticker", ""),
-            "filing_type": chunk.get("filing_type", ""),
+            # "filing_type": chunk.get("filing_type", ""),
             "accession_number": chunk.get("accession_number", ""),
             "year": chunk.get("year", ""),
             "start_token": chunk.get("start_token", 0),

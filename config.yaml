@@ -11,7 +11,7 @@ data:
   sec:
     email: "isaac021102@gmail.com"  
     companies: ["AAPL", "MSFT", "GOOGL"]
-    filing_types: ["10-K", "10-Q"]
+    # filing_types: ["10-K", "10-Q"]
     years: [2022, 2023, 2024]
     
   # fomc:

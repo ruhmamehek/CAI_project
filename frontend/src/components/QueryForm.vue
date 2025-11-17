@@ -35,14 +35,14 @@
             </select>
           </div>
 
-          <div class="form-group">
-            <label for="filing_type">Filing Type:</label>
+          <!-- <div class="form-group"> -->
+            <!-- <label for="filing_type">Filing Type:</label>
             <select id="filing_type" v-model="filters.filing_type">
               <option value="">All Types</option>
               <option value="10-K">10-K</option>
               <option value="10-Q">10-Q</option>
-            </select>
-          </div>
+            </select> -->
+          <!-- </div> -->
 
           <div class="form-group">
             <label for="top_k">Top K:</label>
