@@ -41,19 +41,18 @@ class ChromaDBConfig:
 @dataclass
 class LLMConfig:
     """LLM configuration."""
-    provider: str  # "openai", "anthropic", "ollama"
+    provider: str
     model: str
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     temperature: float = 0.1
-    max_tokens: Optional[int] = None  # None means no limit (model's maximum)
+    max_tokens: Optional[int] = None
     
     @classmethod
     def from_env(cls) -> 'LLMConfig':
         """Create LLMConfig from environment variables."""
-        provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-        model = os.getenv('LLM_MODEL', 'gpt-4o-mini')
-        # If LLM_MAX_TOKENS is not set or empty, use None (no limit)
+        provider = os.getenv('LLM_PROVIDER', 'gemini').lower()
+        model = os.getenv('LLM_MODEL', 'gemini-2.5-flash')
         max_tokens_str = os.getenv('LLM_MAX_TOKENS', '').strip()
         max_tokens = int(max_tokens_str) if max_tokens_str else None
         temperature = float(os.getenv('LLM_TEMPERATURE', '0.1'))
@@ -61,7 +60,11 @@ class LLMConfig:
         if provider == "gemini":
             api_key = os.getenv('GEMINI_API_KEY')
             if not api_key:
-                raise ValueError("GEMINI_API_KEY not set")
+                raise ValueError(
+                    "GEMINI_API_KEY not set. Please set it as an environment variable or in a .env file.\n"
+                    "You can create a .env file in the project root or backend/qa/ directory with:\n"
+                    "  GEMINI_API_KEY=your_gemini_api_key_here"
+                )
             return cls(
                 provider=provider,
                 model=model,
@@ -69,24 +72,6 @@ class LLMConfig:
                 max_tokens=max_tokens,
                 temperature=temperature
             )
-
-        # elif provider == "openai":
-        #     api_key = os.getenv('OPENAI_API_KEY')
-        #     if not api_key:
-        #         raise ValueError("OPENAI_API_KEY not set")
-        #     return cls(provider=provider, model=model, api_key=api_key)
-        
-        # elif provider == "anthropic":
-        #     api_key = os.getenv('ANTHROPIC_API_KEY')
-        #     if not api_key:
-        #         raise ValueError("ANTHROPIC_API_KEY not set")
-        #     return cls(provider=provider, model=model, api_key=api_key)
-        
-        # elif provider == "ollama":
-        #     base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1')
-        #     api_key = os.getenv('OLLAMA_API_KEY', 'ollama')
-        #     return cls(provider=provider, model=model, api_key=api_key, base_url=base_url)
-        
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
@@ -107,28 +92,23 @@ class RAGConfig:
         """Load configuration from YAML file and environment variables."""
         config_file = Path(config_path)
         
-        # Load YAML config if it exists
         if config_file.exists():
             with open(config_file, 'r') as f:
                 yaml_config = yaml.safe_load(f)
         else:
             yaml_config = {}
         
-        # Get retrieval settings from config file
         retrieval_config = yaml_config.get('retrieval', {})
         dense_config = retrieval_config.get('dense', {})
         
         top_k = dense_config.get('top_k', 20)
         embedding_model = dense_config.get('model_name', 'BAAI/bge-base-en-v1.5')
         
-        # Get reranking settings (with fallback to env vars)
         rerank_config = yaml_config.get('reranking', {})
         rerank_max_length = rerank_config.get('max_length', int(os.getenv('RERANK_MAX_LENGTH', '512')))
         enable_reranking = rerank_config.get('enable', os.getenv('ENABLE_RERANKING', 'false').lower() == 'true')
         
-        # Get LLM settings from config file (with fallback to env vars)
         llm_config = yaml_config.get('llm', {})
-        # If max_tokens is None, empty, or not specified, allow unlimited (None)
         llm_max_tokens_raw = llm_config.get('max_tokens', os.getenv('LLM_MAX_TOKENS', '').strip())
         if llm_max_tokens_raw is None or (isinstance(llm_max_tokens_raw, str) and not llm_max_tokens_raw.strip()):
             llm_max_tokens = None
@@ -136,17 +116,14 @@ class RAGConfig:
             llm_max_tokens = int(llm_max_tokens_raw)
         llm_temperature = llm_config.get('temperature', float(os.getenv('LLM_TEMPERATURE', '0.1')))
         
-        # Get verification settings
         verification_config = yaml_config.get('verification', {})
         enable_verification = verification_config.get('enable', os.getenv('ENABLE_VERIFICATION', 'true').lower() == 'true')
         
-        # Create config objects
         chroma = ChromaDBConfig.from_env(
             collection_name="sec_filings",
             embedding_model=embedding_model
         )
         llm = LLMConfig.from_env()
-        # Override max_tokens and temperature if specified in config file
         llm.max_tokens = llm_max_tokens
         llm.temperature = llm_temperature
         

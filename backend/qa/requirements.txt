@@ -7,7 +7,8 @@ flask-cors  # Enable CORS for frontend communication
 python-dotenv
 
 # LLM providers (choose one or more)
-google-generativeai
+google-genai  # For gemini-2.5-flash and newer models
+google-generativeai  # Legacy support (if needed)
 
 # for reranking
 sentence_transformers

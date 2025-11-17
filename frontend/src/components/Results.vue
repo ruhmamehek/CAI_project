@@ -5,7 +5,6 @@
       <div class="answer-content" ref="answerContent" v-html="formattedAnswer"></div>
     </div>
     
-    <!-- Custom Tooltip -->
     <div 
       v-if="tooltip.visible" 
       class="custom-tooltip"
@@ -25,7 +24,6 @@
           <div class="source-header">
             <div class="source-header-left">
               <span class="source-ticker">{{ source.ticker }}</span>
-              <span class="source-filing">{{ source.filing_type }}</span>
               <span class="source-year">{{ source.year }}</span>
               <span class="source-chunk-id">{{ source.chunk_id }}</span>
               <span class="source-score">Score: {{ source.score.toFixed(3) }}</span>
@@ -41,7 +39,17 @@
             </button>
           </div>
           <div class="source-details">
-            <small>Accession: {{ source.accession_number }}</small>
+            <small>Chunk ID: {{ source.chunk_id }}</small>
+            <small v-if="source.chunk_type !== 'Text'"> | Type: {{ source.chunk_type }}</small>
+            <small v-if="source.page"> | Page: {{ source.page }}</small>
+          </div>
+          <div v-if="source.image_path" class="source-image-container">
+            <img 
+              :src="getImageUrl(source.image_path)" 
+              :alt="`${source.chunk_type} from ${source.ticker} ${source.year}`"
+              class="source-image"
+              @error="handleImageError"
+            />
           </div>
           <div 
             v-if="source.text && isExpanded(index)" 
@@ -72,15 +80,13 @@ export default {
         x: 0,
         y: 0
       },
-      expandedSources: new Set()  // Track which sources are expanded
+      expandedSources: new Set()
     }
   },
   computed: {
     formattedAnswer() {
       if (!this.result?.answer) return ''
       
-      // Regular expression to match <source> tags with all attributes
-      // Matches: <source ticker="AAPL" filing_type="10-Q" year="2023" chunk_id="...">text</source>
       const sourceTagRegex = /<source\s+([^>]+)>([^<]+)<\/source>/gi
       
       let formatted = this.result.answer
@@ -88,12 +94,9 @@ export default {
       let lastIndex = 0
       let match
       
-      // Reset regex for iteration
       sourceTagRegex.lastIndex = 0
       
-      // Process each match and build parts array
       while ((match = sourceTagRegex.exec(formatted)) !== null) {
-        // Add text before the match (escape it)
         if (match.index > lastIndex) {
           parts.push({
             type: 'text',
@@ -101,7 +104,6 @@ export default {
           })
         }
         
-        // Extract attributes from the source tag
         const attrs = {}
         const attrRegex = /(\w+)="([^"]+)"/g
         let attrMatch
@@ -109,17 +111,15 @@ export default {
           attrs[attrMatch[1]] = attrMatch[2]
         }
         
-        // Add the highlighted span part
         parts.push({
           type: 'highlight',
-          content: match[2], // The text inside the tag
+          content: match[2],
           attrs: attrs
         })
         
         lastIndex = sourceTagRegex.lastIndex
       }
       
-      // Add remaining text after last match
       if (lastIndex < formatted.length) {
         parts.push({
           type: 'text',
@@ -127,14 +127,12 @@ export default {
         })
       }
       
-      // Build HTML string from parts
       return parts.map(part => {
         if (part.type === 'highlight') {
           const attrs = part.attrs
           const chunkId = attrs.chunk_id || 'Unknown'
           return `<span class="source-highlight" 
                         data-ticker="${this.escapeHtml(attrs.ticker || '')}" 
-                        data-filing-type="${this.escapeHtml(attrs.filing_type || '')}" 
                         data-year="${this.escapeHtml(attrs.year || '')}" 
                         data-chunk-id="${this.escapeHtml(chunkId)}">${this.escapeHtml(part.content)}</span>`
         } else {
@@ -149,8 +147,8 @@ export default {
       div.textContent = text
       return div.innerHTML
     },
-    showTooltip(event, chunkId, ticker, filingType, year) {
-      const tooltipText = `Chunk ID: ${chunkId} | Source: ${ticker} ${filingType} ${year}`
+    showTooltip(event, chunkId, ticker, year) {
+      const tooltipText = `Chunk ID: ${chunkId} | Source: ${ticker} ${year}`
       this.tooltip = {
         visible: true,
         text: tooltipText,
@@ -176,19 +174,15 @@ export default {
       
       const highlights = this.$refs.answerContent.querySelectorAll('.source-highlight')
       highlights.forEach(span => {
-        // Remove existing listeners to avoid duplicates
         const newSpan = span.cloneNode(true)
         span.parentNode.replaceChild(newSpan, span)
         
-        // Get data attributes
         const chunkId = newSpan.getAttribute('data-chunk-id') || 'Unknown'
         const ticker = newSpan.getAttribute('data-ticker') || 'Unknown'
-        const filingType = newSpan.getAttribute('data-filing-type') || ''
         const year = newSpan.getAttribute('data-year') || ''
         
-        // Attach event listeners
         newSpan.addEventListener('mouseenter', (e) => {
-          this.showTooltip(e, chunkId, ticker, filingType, year)
+          this.showTooltip(e, chunkId, ticker, year)
         })
         newSpan.addEventListener('mouseleave', () => {
           this.hideTooltip()
@@ -200,6 +194,17 @@ export default {
           }
         })
       })
+    },
+    getImageUrl(imagePath) {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8888'
+      if (imagePath.startsWith('http')) {
+        return imagePath
+      }
+      return `${apiBaseUrl}/images/${imagePath}`
+    },
+    handleImageError(event) {
+      console.error('Error loading image:', event.target.src)
+      event.target.style.display = 'none'
     }
   },
   mounted() {

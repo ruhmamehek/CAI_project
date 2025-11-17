@@ -1,0 +1,406 @@
+[
+  {
+    "chunk_id": "text_001_000",
+    "text": "Our cybersecurity risk management and strategy processes are overseen by leaders from our Information Security, Product Security, Compliance and Legal teams. Such individuals have an average of over 15 years of prior work experience in various roles involving information technology, including security, auditing, compliance, systems and programming. These individuals are informed about, and monitor the prevention, mitigation, detection and remediation of cybersecurity incidents through their management of, and participation in, the cybersecurity risk management and strategy processes described above, including the operation of our incident response plan, and report to the Audit Committee on any appropriate items.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 75.0,
+      "x_2": 804.0,
+      "y_2": 121.0
+    }
+  },
+  {
+    "chunk_id": "text_001_001",
+    "text": "ITEM 2. PROPERTIES",
+    "type": "Section header",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 141.0,
+      "x_2": 135.0,
+      "y_2": 152.0
+    }
+  },
+  {
+    "chunk_id": "text_001_002",
+    "text": "We are headquartered in Austin, Texas. Our principal facilities include a large number of properties in North America, Europe and Asia utilized for manufacturing and assembly, warehousing, engineering, retail and service locations, Supercharger sites and administrative and sales offices. Our facilities are used to support both of our reporting segments, and are suitable and adequate for the conduct of our business. We generally lease such facilities with the primary exception of some manufacturing facilities. The following table sets forth the location of our primary owned and leased manufacturing facilities.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 160.0,
+      "x_2": 804.0,
+      "y_2": 206.0
+    }
+  },
+  {
+    "chunk_id": "table_001_000",
+    "text": "TITLE: Primary Manufacturing Facilities: Location and Ownership Status. This table details the company's key manufacturing facilities, their geographical locations, and their ownership type (owned or leased).\n\nDESCRIPTION: The table lists seven primary manufacturing facilities. Four facilities are explicitly owned: Gigafactory Texas (Austin, Texas), Fremont Factory (Fremont, California), Gigafactory Nevada (Sparks, Nevada), and Gigafactory Berlin-Brandenburg (Grunheide, Germany). Two facilities are explicitly leased: Gigafactory New York (Buffalo, New York) and Megafactory (Lathrop, California). Gigafactory Shanghai (Shanghai, China) has a hybrid ownership structure where the building is owned, but the land use rights are held under an initial 50-year term and treated as operating lease right-of-use assets.\n\nNOTABLE PATTERNS:\n1.  **Global Footprint:** The company operates manufacturing facilities across multiple continents, including North America (Texas, California, Nevada, New York), Europe (Germany), and Asia (China), indicating a broad global manufacturing strategy.\n2.  **Majority Owned \"Gigafactories\":** Most of the large-scale \"Gigafactory\" branded facilities, particularly those in the US and Europe, are owned by the company.\n3.  **Hybrid Ownership Model:** The Gigafactory Shanghai demonstrates a unique model where the company owns the physical building but leases the land for a significant term (50 years), which is accounted for as an operating lease. This highlights flexibility in asset acquisition strategies depending on regional regulations or investment approaches.\n4.  **Specific Leased Facilities:** The Gigafactory New York and Megafactory facilities are noted as leased, suggesting a mix of ownership and leasing strategies for different operational needs or geographical markets.",
+    "type": "Table",
+    "page": 1,
+    "image_path": "data/sec_pdfs/clippings/tsla-20231231-60-64/clippings/page_001_table_000.png",
+    "filename": "page_001_table_000.png",
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 32.0,
+      "y_1": 220.0,
+      "x_2": 806.0,
+      "y_2": 335.0
+    },
+    "size": {
+      "width": 774,
+      "height": 115
+    }
+  },
+  {
+    "chunk_id": "text_001_004",
+    "text": "* We own the building and the land use rights with an initial term of 50 years. The land use rights are treated as operating lease right-of-use assets.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 347.0,
+      "x_2": 641.0,
+      "y_2": 357.0
+    }
+  },
+  {
+    "chunk_id": "text_001_005",
+    "text": "ITEM 3. LEGAL PROCEEDINGS",
+    "type": "Section header",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 378.0,
+      "x_2": 182.0,
+      "y_2": 388.0
+    }
+  },
+  {
+    "chunk_id": "text_001_006",
+    "text": "For a description of our material pending legal proceedings, please see Note 15, Commitments and Contingencies , to the consolidated financial statements included elsewhere in this Annual Report on Form 10-K.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 395.0,
+      "x_2": 788.0,
+      "y_2": 417.0
+    }
+  },
+  {
+    "chunk_id": "text_001_007",
+    "text": "In addition, each of the matters below is being disclosed pursuant to Item 103 of Regulation S-K because it relates to environmental regulations and aggregate civil penalties that we currently believe could potentially exceed $1 million. We believe that any proceeding that is material to our business or financial condition is likely to have potential penalties far in excess of such amount.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 431.0,
+      "x_2": 798.0,
+      "y_2": 465.0
+    }
+  },
+  {
+    "chunk_id": "text_001_008",
+    "text": "District attorneys in certain California counties conducted an investigation into Tesla’s waste segregation practices pursuant to Cal. Health & Saf. Code § 25100 et seq. and Cal. Civil Code § 1798.80. Tesla has implemented various remedial measures, including conducting training and audits, and enhancements to its site waste management programs, and settlement discussions are ongoing. While the outcome of this matter cannot be determined at this time, it is not currently expected to have a material adverse impact on our business.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 479.0,
+      "x_2": 791.0,
+      "y_2": 513.0
+    }
+  },
+  {
+    "chunk_id": "text_001_009",
+    "text": "ITEM 4. MINE SAFETY DISCLOSURES",
+    "type": "Section header",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 534.0,
+      "x_2": 215.0,
+      "y_2": 543.0
+    }
+  },
+  {
+    "chunk_id": "text_001_010",
+    "text": "Not applicable.",
+    "type": "Text",
+    "page": 1,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 60.0,
+      "y_1": 552.0,
+      "x_2": 122.0,
+      "y_2": 561.0
+    }
+  },
+  {
+    "chunk_id": "text_003_011",
+    "text": "PART II",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 402.0,
+      "y_1": 70.0,
+      "x_2": 438.0,
+      "y_2": 80.0
+    }
+  },
+  {
+    "chunk_id": "text_003_012",
+    "text": "ITEM 5. MARKET FOR REGISTRANT’S COMMON EQUITY, RELATED STOCKHOLDER MATTERS AND ISSUER PURCHASES OF EQUITY SECURITIES",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 94.0,
+      "x_2": 745.0,
+      "y_2": 104.0
+    }
+  },
+  {
+    "chunk_id": "text_003_013",
+    "text": "Market Information",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 113.0,
+      "x_2": 119.0,
+      "y_2": 122.0
+    }
+  },
+  {
+    "chunk_id": "text_003_014",
+    "text": "Our common stock has traded on The NASDAQ Global Select Market under the symbol “TSLA” since it began trading on June 29, 2010. Our initial public offering was priced at approximately $1.13 per share on June 28, 2010 as adjusted to give effect to the three-for-one stock split effected in the form of a stock dividend in August 2022 (the “2022 Stock Split”) and the five-for-one stock split effected in the form of a stock dividend in August 2020 (the “2020 Stock Split”).",
+    "type": "Text",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 129.0,
+      "x_2": 810.0,
+      "y_2": 163.0
+    }
+  },
+  {
+    "chunk_id": "text_003_015",
+    "text": "Holders",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 183.0,
+      "x_2": 68.0,
+      "y_2": 194.0
+    }
+  },
+  {
+    "chunk_id": "text_003_016",
+    "text": "As of January 22, 2024, there were 9,300 holders of record of our common stock. A substantially greater number of holders of our common stock are “street name” or beneficial holders, whose shares are held by banks, brokers and other financial institutions.",
+    "type": "Text",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 201.0,
+      "x_2": 805.0,
+      "y_2": 223.0
+    }
+  },
+  {
+    "chunk_id": "text_003_017",
+    "text": "Dividend Policy",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 244.0,
+      "x_2": 100.0,
+      "y_2": 253.0
+    }
+  },
+  {
+    "chunk_id": "text_003_018",
+    "text": "We have never declared or paid cash dividends on our common stock. We currently do not anticipate paying any cash dividends in the foreseeable future. Any future determination to declare cash dividends will be made at the discretion of our board of directors, subject to applicable laws, and will depend on our financial condition, results of operations, capital requirements, general business conditions and other factors that our board of directors may deem relevant.",
+    "type": "Text",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 261.0,
+      "x_2": 807.0,
+      "y_2": 295.0
+    }
+  },
+  {
+    "chunk_id": "text_003_019",
+    "text": "Stock Performance Graph",
+    "type": "Section header",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 316.0,
+      "x_2": 145.0,
+      "y_2": 325.0
+    }
+  },
+  {
+    "chunk_id": "text_003_020",
+    "text": "This performance graph shall not be deemed “filed” for purposes of Section 18 of the Securities Exchange Act of 1934, as amended (the “Exchange Act”), or incorporated by reference into any filing of Tesla, Inc. under the Securities Act of 1933, as amended (the “Securities Act”), or the Exchange Act, except as shall be expressly set forth by specific reference in such filing.",
+    "type": "Text",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 32.0,
+      "y_1": 334.0,
+      "x_2": 802.0,
+      "y_2": 356.0
+    }
+  },
+  {
+    "chunk_id": "text_003_021",
+    "text": "The following graph shows a comparison, from January 1, 2019 through December 31, 2023, of the cumulative total return on our common stock, The NASDAQ Composite Index and a group of all public companies sharing the same SIC code as us, which is SIC code 3711, “Motor Vehicles and Passenger Car Bodies” (Motor Vehicles and Passenger Car Bodies Public Company Group). Such returns are based on historical results and are not intended to suggest future performance. Data for The NASDAQ Composite Index and the Motor Vehicles and Passenger Car Bodies Public Company Group assumes an investment of $100 on January 1, 2019 and reinvestment of dividends. We have never declared or paid cash dividends on our common stock nor do we anticipate paying any such cash dividends in the foreseeable future.",
+    "type": "Text",
+    "page": 3,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 364.0,
+      "x_2": 810.0,
+      "y_2": 422.0
+    }
+  },
+  {
+    "chunk_id": "figure_004_001",
+    "text": "TITLE: Comparison of 60 Months Cumulative Total Return for Tesla, NASDAQ Composite, and Motor Vehicles Industry Group\nDESCRIPTION: This line chart illustrates the cumulative total return over a 60-month period, from December 2018 to December 2023, for three distinct entities, assuming an initial investment of $100 at the start of the period. The Y-axis represents the value of the investment in dollars, ranging from $0 to $1,800, while the X-axis tracks time monthly.\n\nThe three series plotted are:\n1.  **Motor Vehicles and Passenger Car Bodies Public Company Group** (solid line): This represents a composite of public companies in the specified industry. It shows relatively stable, moderate growth, starting at approximately $100 in Dec-18 and ending around $215 in Dec-23, indicating a cumulative return of about 115%.\n2.  **NASDAQ Composite** (dashed line): This represents the performance of the broader technology-heavy market index. It also shows consistent growth, starting at approximately $100 in Dec-18 and ending around $240 in Dec-23, yielding a cumulative return of about 140%. Its performance generally outpaced the industry group but remained significantly below Tesla's peak.\n3.  **Tesla** (dotted line): This line demonstrates extremely high growth and volatility. Starting at approximately $100 in Dec-18, Tesla's return remained relatively modest until early 2020. From February 2020 (around $130), it experienced explosive growth, peaking at approximately $1,730 in November 2021. This represents a cumulative return of over 1,600% from the start. Following this peak, Tesla saw a steep decline, bottoming out around $570 in December 2022. It then recovered substantially through 2023, ending the period at approximately $1,130 in Dec-23, for a cumulative return of about 1,030%.\n\nIn summary, Tesla's cumulative total return significantly outperformed both the NASDAQ Composite and its industry peer group over the 60-month period, albeit with considerable volatility and a substantial drawdown from its late 2021 peak.",
+    "type": "Figure",
+    "page": 4,
+    "image_path": "data/sec_pdfs/clippings/tsla-20231231-60-64/clippings/page_004_figure_001.png",
+    "filename": "page_004_figure_001.png",
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 167.0,
+      "y_1": 74.0,
+      "x_2": 675.0,
+      "y_2": 436.0
+    },
+    "size": {
+      "width": 508,
+      "height": 362
+    }
+  },
+  {
+    "chunk_id": "text_004_023",
+    "text": "Unregistered Sales of Equity Securities and Use of Proceeds",
+    "type": "Section header",
+    "page": 4,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 33.0,
+      "y_1": 460.0,
+      "x_2": 288.0,
+      "y_2": 468.0
+    }
+  },
+  {
+    "chunk_id": "text_004_024",
+    "text": "None.",
+    "type": "Text",
+    "page": 4,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 60.0,
+      "y_1": 477.0,
+      "x_2": 86.0,
+      "y_2": 486.0
+    }
+  },
+  {
+    "chunk_id": "text_004_025",
+    "text": "Purchases of Equity Securities by the Issuer and Affiliated Purchasers",
+    "type": "Section header",
+    "page": 4,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 32.0,
+      "y_1": 508.0,
+      "x_2": 331.0,
+      "y_2": 517.0
+    }
+  },
+  {
+    "chunk_id": "text_004_026",
+    "text": "None.",
+    "type": "Text",
+    "page": 4,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 60.0,
+      "y_1": 525.0,
+      "x_2": 86.0,
+      "y_2": 535.0
+    }
+  },
+  {
+    "chunk_id": "text_004_027",
+    "text": "ITEM 6. [RESERVED] https://www.sec.gov/Archives/edgar/data/1318605/000162828024002390/tsla-20231231.htm",
+    "type": "Section header",
+    "page": 4,
+    "ticker": "TSLA",
+    "year": "2023",
+    "coordinates": {
+      "x_1": 24.0,
+      "y_1": 556.0,
+      "x_2": 323.0,
+      "y_2": 578.0
+    }
+  }
+]

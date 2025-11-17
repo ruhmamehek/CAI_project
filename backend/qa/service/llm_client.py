@@ -1,7 +1,7 @@
 """LLM client abstraction for different providers."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from abc import ABC, abstractmethod
 
 from .config import LLMConfig
@@ -13,216 +13,89 @@ class LLMClient(ABC):
     """Abstract base class for LLM clients."""
     
     @abstractmethod
-    def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """
-        Generate text from prompt.
-        
-        Args:
-            prompt: User prompt
-            system_prompt: System prompt (optional)
-            
-        Returns:
-            Generated text
-        """
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, images: Optional[List[bytes]] = None, image_mime_types: Optional[List[str]] = None) -> str:
+        """Generate text from prompt."""
         pass
 
 class GeminiClient(LLMClient):
     """Gemini LLM client."""
     
     def __init__(self, config: LLMConfig):
-        """
-        Initialize Gemini client.
-        
-        Args:
-            config: LLM configuration
-        """
+        """Initialize Gemini client."""
         try:
-            import google.generativeai as genai
+            from google import genai
         except ImportError:
-            raise ImportError("google-generativeai package not installed. Install with: pip install google-generativeai")
+            raise ImportError("google-genai package not installed. Install with: pip install google-genai")
         
         if not config.api_key:
             raise ValueError("Gemini API key not provided")
         
-        genai.configure(api_key=config.api_key)
-        self.genai = genai
-        self.model = config.model
+        self.client = genai.Client(api_key=config.api_key)
+        self.model_name = config.model
         self.temperature = config.temperature
         self.max_tokens = config.max_tokens
         
-        logger.info(f"Initialized Gemini client with model: {self.model}")
+        logger.info(f"Initialized Gemini client with model: {self.model_name}")
     
-    def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        """Generate response using Gemini."""
-        # Build the full prompt with system message if provided
-        full_prompt = prompt
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, images: Optional[List[bytes]] = None, image_mime_types: Optional[List[str]] = None) -> str:
+        """Generate response using Gemini with retry logic for rate limits."""
+        import time
+        
+        max_retries = 3
+        retry_delay = 5
+        
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
+        else:
+            full_prompt = prompt
         
-        # Build generation config - only include max_output_tokens if specified
-        generation_config = {
-            "temperature": self.temperature,
-        }
-        if self.max_tokens is not None:
-            generation_config["max_output_tokens"] = self.max_tokens
+        from google.genai import types
+        contents = [full_prompt]
+        if images and image_mime_types:
+            for img_bytes, mime_type in zip(images, image_mime_types):
+                contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime_type))
         
-        # Generate content using Gemini
-        model = self.genai.GenerativeModel(
-            model_name=self.model,
-            generation_config=generation_config
-        )
-        
-        response = model.generate_content(full_prompt)
-        return response.text.strip()
-        
-# class OpenAIClient(LLMClient):
-#     """OpenAI LLM client."""
-    
-#     def __init__(self, config: LLMConfig):
-#         """
-#         Initialize OpenAI client.
-        
-#         Args:
-#             config: LLM configuration
-#         """
-#         try:
-#             from openai import OpenAI
-#         except ImportError:
-#             raise ImportError("openai package not installed. Install with: pip install openai")
-        
-#         if not config.api_key:
-#             raise ValueError("OpenAI API key not provided")
-        
-#         self.client = OpenAI(api_key=config.api_key)
-#         self.model = config.model
-#         self.temperature = config.temperature
-#         self.max_tokens = config.max_tokens
-        
-#         logger.info(f"Initialized OpenAI client with model: {self.model}")
-    
-#     def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-#         """Generate response using OpenAI."""
-#         messages = []
-        
-#         if system_prompt:
-#             messages.append({"role": "system", "content": system_prompt})
-        
-#         messages.append({"role": "user", "content": prompt})
-        
-#         response = self.client.chat.completions.create(
-#             model=self.model,
-#             messages=messages,
-#             temperature=self.temperature,
-#             max_tokens=self.max_tokens
-#         )
-        
-#         return response.choices[0].message.content.strip()
-
-
-# class AnthropicClient(LLMClient):
-#     """Anthropic LLM client."""
-    
-#     def __init__(self, config: LLMConfig):
-#         """
-#         Initialize Anthropic client.
-        
-#         Args:
-#             config: LLM configuration
-#         """
-#         try:
-#             from anthropic import Anthropic
-#         except ImportError:
-#             raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-        
-#         if not config.api_key:
-#             raise ValueError("Anthropic API key not provided")
-        
-#         self.client = Anthropic(api_key=config.api_key)
-#         self.model = config.model
-#         self.temperature = config.temperature
-#         self.max_tokens = config.max_tokens
-        
-#         logger.info(f"Initialized Anthropic client with model: {self.model}")
-    
-    # def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-    #     """Generate response using Anthropic."""
-    #     messages = [{"role": "user", "content": prompt}]
-        
-    #     response = self.client.messages.create(
-    #         model=self.model,
-    #         max_tokens=self.max_tokens,
-    #         temperature=self.temperature,
-    #         messages=messages,
-    #         system=system_prompt if system_prompt else None
-    #     )
-        
-    #     return response.content[0].text.strip()
-
-
-# class OllamaClient(LLMClient):
-#     """Ollama LLM client (OpenAI-compatible API)."""
-    
-#     def __init__(self, config: LLMConfig):
-#         """
-#         Initialize Ollama client.
-        
-#         Args:
-#             config: LLM configuration
-#         """
-#         try:
-#             from openai import OpenAI
-#         except ImportError:
-#             raise ImportError("openai package not installed for Ollama. Install with: pip install openai")
-        
-#         base_url = config.base_url or 'http://localhost:11434/v1'
-#         api_key = config.api_key or 'ollama'
-        
-#         self.client = OpenAI(base_url=base_url, api_key=api_key)
-#         self.model = config.model
-#         self.temperature = config.temperature
-#         self.max_tokens = config.max_tokens
-        
-#         logger.info(f"Initialized Ollama client with model: {self.model} at {base_url}")
-    
-#     def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-#         """Generate response using Ollama."""
-#         messages = []
-        
-#         if system_prompt:
-#             messages.append({"role": "system", "content": system_prompt})
-        
-#         messages.append({"role": "user", "content": prompt})
-        
-#         response = self.client.chat.completions.create(
-#             model=self.model,
-#             messages=messages,
-#             temperature=self.temperature,
-#             max_tokens=self.max_tokens
-#         )
-        
-#         return response.choices[0].message.content.strip()
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents,
+                    config={
+                        "temperature": self.temperature,
+                        "max_output_tokens": self.max_tokens,
+                    } if self.max_tokens else {
+                        "temperature": self.temperature,
+                    }
+                )
+                
+                return response.text.strip()
+                
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "quota" in error_str.lower() or "rate limit" in error_str.lower():
+                    if attempt < max_retries - 1:
+                        if "retry in" in error_str.lower():
+                            import re
+                            delay_match = re.search(r'retry in ([\d.]+)s', error_str, re.IGNORECASE)
+                            if delay_match:
+                                retry_delay = float(delay_match.group(1)) + 1
+                        
+                        logger.warning(f"Rate limit error (attempt {attempt + 1}/{max_retries}). Retrying in {retry_delay:.1f} seconds...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    else:
+                        logger.error(f"Rate limit error after {max_retries} attempts")
+                        raise ValueError(f"Gemini API rate limit exceeded. Please try again later. Error: {error_str}")
+                else:
+                    raise
 
 
 def create_llm_client(config: LLMConfig) -> LLMClient:
-    """
-    Create LLM client based on provider.
-    
-    Args:
-        config: LLM configuration
-        
-    Returns:
-        LLMClient instance
-    """
+    """Create LLM client based on provider."""
     provider = config.provider.lower()
     
     if provider == "gemini":
         return GeminiClient(config)
-    elif provider == "openai":
-        return OpenAIClient(config)
-    elif provider == "anthropic":
-        return AnthropicClient(config)
-    elif provider == "ollama":
-        return OllamaClient(config)
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
-

@@ -19,9 +19,11 @@
             <label for="ticker">Ticker:</label>
             <select id="ticker" v-model="filters.ticker">
               <option value="">All Companies</option>
-              <option value="AAPL">AAPL (Apple)</option>
+              <option value="JNJ">JNJ (Johnson & Johnson)</option>
+              <option value="JPM">JPM (JPMorgan Chase)</option>
               <option value="MSFT">MSFT (Microsoft)</option>
-              <option value="GOOGL">GOOGL (Google)</option>
+              <option value="WMT">WMT (Walmart)</option>
+              <option value="XOM">XOM (Exxon Mobil)</option>
             </select>
           </div>
 
@@ -29,20 +31,10 @@
             <label for="year">Year:</label>
             <select id="year" v-model="filters.year">
               <option value="">All Years</option>
-              <option value="2022">2022</option>
               <option value="2023">2023</option>
               <option value="2024">2024</option>
             </select>
           </div>
-
-          <!-- <div class="form-group"> -->
-            <!-- <label for="filing_type">Filing Type:</label>
-            <select id="filing_type" v-model="filters.filing_type">
-              <option value="">All Types</option>
-              <option value="10-K">10-K</option>
-              <option value="10-Q">10-Q</option>
-            </select> -->
-          <!-- </div> -->
 
           <div class="form-group">
             <label for="top_k">Top K:</label>
@@ -85,8 +77,7 @@ export default {
       query: '',
       filters: {
         ticker: '',
-        year: '',
-        filing_type: ''
+        year: ''
       },
       top_k: 20
     }
@@ -97,7 +88,6 @@ export default {
         query: this.query.trim()
       }
 
-      // Add filters if any are selected
       const activeFilters = {}
       if (this.filters.ticker) {
         activeFilters.ticker = this.filters.ticker
@@ -105,15 +95,11 @@ export default {
       if (this.filters.year) {
         activeFilters.year = this.filters.year
       }
-      if (this.filters.filing_type) {
-        activeFilters.filing_type = this.filters.filing_type
-      }
 
       if (Object.keys(activeFilters).length > 0) {
         payload.filters = activeFilters
       }
 
-      // Add top_k if specified
       if (this.top_k) {
         payload.top_k = this.top_k
       }
@@ -124,8 +110,7 @@ export default {
       this.query = ''
       this.filters = {
         ticker: '',
-        year: '',
-        filing_type: ''
+        year: ''
       }
       this.top_k = 20
     }
