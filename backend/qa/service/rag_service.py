@@ -84,7 +84,7 @@ class RAGService:
         query: str,
         chunks: List[Chunk],
         max_context_length: Optional[int] = None
-    ) -> str:
+    ) -> tuple[str, Optional[str]]:
         """
         Generate response using LLM with retrieved chunks as context.
         
@@ -94,10 +94,10 @@ class RAGService:
             max_context_length: Maximum context length (defaults to config.max_context_length)
             
         Returns:
-            Generated response text
+            Tuple of (answer, reasoning_steps) where reasoning_steps may be None
         """
         if not chunks:
-            return self.prompt_builder.build_empty_response()
+            return self.prompt_builder.build_empty_response(), None
         
         logger.info(f"Generating response for query: {query}")
         max_length = max_context_length or self.config.max_context_length
@@ -112,9 +112,14 @@ class RAGService:
 
         # Generate response
         system_prompt = self.prompt_builder.SYSTEM_PROMPT
-        response = self.llm_client.generate(prompt, system_prompt=system_prompt)
+        raw_response = self.llm_client.generate(prompt, system_prompt=system_prompt)
         
-        return response
+        # Parse response to extract reasoning and answer
+        answer, reasoning_steps = self.prompt_builder.parse_response(raw_response)
+        
+        # Store reasoning steps for later use (will be added to QueryResponse)
+        # For now, we'll return just the answer, but store reasoning in the query method
+        return answer, reasoning_steps
     
     def rerank_chunks(self, query: str, chunks: List[Chunk], top_k: Optional[int] = None) -> List[Chunk]:
         """
@@ -186,8 +191,8 @@ class RAGService:
         chunks = self.rerank_chunks(query, chunks, top_k=18)
         logger.info(f"Reranked {len(chunks)} chunks")
 
-        # Generate response
-        answer = self.generate_response(query, chunks)
+        # Generate response (returns answer and reasoning steps)
+        answer, reasoning_steps = self.generate_response(query, chunks)
         
         # Extract source information
         sources = [chunk.to_source() for chunk in chunks]
@@ -207,7 +212,10 @@ class RAGService:
             answer=answer,
             sources=sources,
             num_chunks_retrieved=len(chunks),
-            verification=verification_result
+            verification=verification_result,
+            reasoning_steps=reasoning_steps,
+            filter_reasoning=filter_reasoning,
+            applied_filters=applied_filters
         )
     
     def get_collection_info(self) -> Dict[str, Any]:

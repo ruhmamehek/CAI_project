@@ -68,12 +68,17 @@ def query():
         # Check if verification should be enabled (default: True)
         enable_verification = data.get('enable_verification', True)
         
+        # Check if auto filter determination should be enabled (default: True)
+        # If filters are explicitly provided, auto-determination is disabled
+        auto_determine_filters = data.get('auto_determine_filters', query_request.filters is None)
+        
         # Execute RAG pipeline
         response = rag_service.query(
             query=query_request.query,
             filters=query_request.filters,
             top_k=query_request.top_k,
-            enable_verification=enable_verification
+            enable_verification=enable_verification,
+            auto_determine_filters=auto_determine_filters
         )
         
         return jsonify(response.to_dict())

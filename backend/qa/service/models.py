@@ -45,6 +45,9 @@ class QueryResponse:
     sources: List[Source]
     num_chunks_retrieved: int
     verification: Optional[Dict[str, Any]] = None
+    reasoning_steps: Optional[str] = None  # Chain-of-thought reasoning
+    filter_reasoning: Optional[str] = None  # Reasoning for filter selection
+    applied_filters: Optional[Dict[str, Any]] = None  # Filters that were applied
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -66,6 +69,12 @@ class QueryResponse:
         }
         if self.verification:
             result["verification"] = self.verification
+        if self.reasoning_steps:
+            result["reasoning_steps"] = self.reasoning_steps
+        if self.filter_reasoning:
+            result["filter_reasoning"] = self.filter_reasoning
+        if self.applied_filters:
+            result["applied_filters"] = self.applied_filters
         return result
 
 

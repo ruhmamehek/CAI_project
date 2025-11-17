@@ -1,6 +1,6 @@
 """Prompt building for RAG queries."""
 
-from typing import List
+from typing import List, Optional, Dict, Any
 from .models import Chunk
 import logging
 
@@ -9,7 +9,12 @@ logger = logging.getLogger(__name__)
 class PromptBuilder:
     """Builder for RAG prompts."""
     
-    SYSTEM_PROMPT = "You are a helpful financial analyst assistant."
+    SYSTEM_PROMPT = """You are an expert financial analyst assistant with deep expertise in SEC filings, financial statements, and corporate analysis. You excel at:
+- Multi-step calculations and financial analysis
+- Synthesizing information from multiple sources
+- Connecting quantitative data with qualitative narratives
+- Performing inferential reasoning and projections
+- Identifying patterns, contradictions, and relationships in financial data"""
     
     @staticmethod
     def build_context(chunks: List[Chunk], max_length: int = 50000) -> str:
@@ -92,26 +97,187 @@ Context from SEC filings:
 
 Question: {query}
 
+CRITICAL: Use Chain-of-Thought Reasoning
+
+For complex questions involving calculations, multi-step analysis, synthesis, or inferential reasoning, you MUST show your reasoning process using the following format:
+
+<thinking>
+Step 1: [Describe what information you need to find first]
+Step 2: [Describe the next step or calculation]
+Step 3: [Continue with subsequent steps]
+...
+Final Step: [Synthesize the findings]
+</thinking>
+
+<answer>
+[Your final answer with proper citations]
+</answer>
+
+Examples of when to use chain-of-thought:
+
+1. **Multi-Step Calculations**: 
+   - "Calculate Net Working Capital for two years"
+   - Show: Step 1: Find Current Assets Year 1, Step 2: Find Current Liabilities Year 1, Step 3: Calculate NWC Year 1, etc.
+
+2. **Synthesis Questions**:
+   - "Compare Gross Margin and Operating Margin trends"
+   - Show: Step 1: Retrieve revenue and COGS, Step 2: Calculate Gross Margin, Step 3: Retrieve Operating Income, Step 4: Calculate Operating Margin, Step 5: Compare trends
+
+3. **Narrative & Risk Analysis**:
+   - "Identify risks and find evidence of materialization"
+   - Show: Step 1: Extract top risks from Risk Factors, Step 2: Search MD&A for evidence, Step 3: Connect quantitative impact
+
+4. **Inferential Reasoning**:
+   - "Calculate debt covenant headroom"
+   - Show: Step 1: Find covenant requirements, Step 2: Retrieve current financial metrics, Step 3: Calculate current ratio, Step 4: Calculate headroom
+
 Instructions:
-- Answer the question based solely on the provided context
-- If the context doesn't contain enough information to answer the question, say so
-- Cite specific sources (ticker, filing type, year) when referencing information
-- Be concise and accurate
+- ALWAYS use <thinking> tags for complex questions (calculations, multi-step analysis, synthesis)
+- For simple factual questions, you may skip the thinking section
+- Answer based solely on the provided context
+- If the context doesn't contain enough information, say so in your thinking
+- Cite specific sources using <source> tags (see below)
 - Use professional financial terminology
+- Show all calculations explicitly
 
-IMPORTANT:
-For all information presented in your answer that is drawn from a chunk, cite the chunk from which the information was derived by creating tags around the information. 
+CITATION FORMAT:
+For all information presented in your answer that is drawn from a chunk, cite the chunk using:
+<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> [cited text] </source>
 
-Each chunk will have a source header that looks like this:[Source: AAPL 10-K 2023, chunk_id: 1234567890]
+Each chunk has a source header: [Source: AAPL 10-K 2023, chunk_id: 1234567890]
 
-For example, if the information is from the 2023 10-K of Apple Inc., the tag should be:
-<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
+Response format:
+<thinking>
+[Your reasoning steps - only for complex questions]
+</thinking>
 
-
-Answer:"""
+<answer>
+[Your final answer with citations]
+</answer>"""
     
     @staticmethod
     def build_empty_response() -> str:
         """Build response when no chunks are retrieved."""
         return "I couldn't find any relevant information in the SEC filings to answer your question."
+    
+    @staticmethod
+    def build_filter_analysis_prompt(query: str) -> str:
+        """
+        Build prompt for analyzing query to determine appropriate filters.
+        
+        Args:
+            query: User query
+            
+        Returns:
+            Prompt for filter analysis
+        """
+        return f"""You are a financial data retrieval assistant. Analyze the following query and determine what filters should be applied to retrieve the most relevant SEC filing documents.
+
+Query: {query}
+
+Your task:
+1. Identify if a specific company (ticker) is mentioned or implied
+2. Identify if a specific year or time period is mentioned
+3. Identify if a specific filing type (10-K, 10-Q) is mentioned or would be most relevant
+4. Explain your reasoning for each filter decision
+
+Available filters:
+- ticker: Company ticker symbol (e.g., "AAPL", "MSFT", "GOOGL")
+- year: Fiscal year (e.g., "2023", "2022")
+- filing_type: Type of filing ("10-K" for annual, "10-Q" for quarterly)
+
+Response format (JSON):
+{{
+    "reasoning": "Step-by-step explanation of why each filter was chosen or not chosen",
+    "filters": {{
+        "ticker": "AAPL" or null,
+        "year": "2023" or null,
+        "filing_type": "10-K" or "10-Q" or null
+    }},
+    "confidence": 0.0-1.0
+}}
+
+Only include filters that are explicitly mentioned or strongly implied. If uncertain, set to null.
+Respond with ONLY the JSON object, no additional text."""
+
+    @staticmethod
+    def parse_response(response: str) -> tuple[str, Optional[str]]:
+        """
+        Parse response to extract thinking and answer sections.
+        
+        Args:
+            response: Raw LLM response
+            
+        Returns:
+            Tuple of (answer, thinking) where thinking may be None
+        """
+        import re
+        
+        # Try to extract thinking section
+        thinking_match = re.search(r'<thinking>(.*?)</thinking>', response, re.DOTALL | re.IGNORECASE)
+        thinking = thinking_match.group(1).strip() if thinking_match else None
+        
+        # Try to extract answer section
+        answer_match = re.search(r'<answer>(.*?)</answer>', response, re.DOTALL | re.IGNORECASE)
+        if answer_match:
+            answer = answer_match.group(1).strip()
+        else:
+            # If no <answer> tags, use the whole response (minus thinking if present)
+            if thinking_match:
+                # Remove thinking section from response
+                answer = response[:thinking_match.start()] + response[thinking_match.end():]
+                answer = re.sub(r'</?thinking>', '', answer, flags=re.IGNORECASE).strip()
+            else:
+                answer = response.strip()
+        
+        return answer, thinking
+    
+    @staticmethod
+    def parse_filter_analysis(response: str) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Parse filter analysis response from LLM.
+        
+        Args:
+            response: Raw LLM response with JSON
+            
+        Returns:
+            Tuple of (filters_dict, reasoning) where filters_dict may be None
+        """
+        import json
+        import re
+        
+        # Try to extract JSON from response
+        start_idx = response.find('{')
+        if start_idx != -1:
+            # Find matching closing brace
+            brace_count = 0
+            end_idx = start_idx
+            for i in range(start_idx, len(response)):
+                if response[i] == '{':
+                    brace_count += 1
+                elif response[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end_idx = i + 1
+                        break
+            
+            if end_idx > start_idx:
+                try:
+                    json_str = response[start_idx:end_idx]
+                    result = json.loads(json_str)
+                    
+                    filters = result.get("filters", {})
+                    # Remove null values
+                    filters = {k: v for k, v in filters.items() if v is not None}
+                    if not filters:
+                        filters = None
+                    
+                    reasoning = result.get("reasoning", None)
+                    
+                    return filters, reasoning
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    logger.warning(f"Failed to parse filter analysis JSON: {e}")
+                    return None, None
+        
+        return None, None
 

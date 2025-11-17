@@ -227,6 +227,179 @@ main {
     margin-top: 2rem;
 }
 
+/* Filter Reasoning Box */
+.filter-reasoning-box {
+    background: #1e3a3f;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #10b981;
+    border: 1px solid #065f46;
+}
+
+.filter-reasoning-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.filter-reasoning-header h2 {
+    color: #6ee7b7;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    flex: 1;
+}
+
+.filter-icon {
+    font-size: 1.5rem;
+}
+
+.applied-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-badge {
+    background: #10b981;
+    color: #ffffff;
+    padding: 0.375rem 0.75rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.toggle-filter-reasoning-btn {
+    background: #059669;
+    border: 1px solid #10b981;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.toggle-filter-reasoning-btn:hover {
+    background: #10b981;
+    border-color: #34d399;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.filter-reasoning-content {
+    animation: slideDown 0.3s ease-out;
+}
+
+.filter-reasoning-text {
+    background: #0f172a;
+    padding: 1.5rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    color: #e0e7ff;
+    font-size: 1rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.filter-reasoning-text strong {
+    color: #6ee7b7;
+    font-weight: 600;
+}
+
+.filter-reasoning-text br {
+    margin-bottom: 0.5rem;
+}
+
+/* Reasoning Box */
+.reasoning-box {
+    background: #1e3a5f;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #8b5cf6;
+    border: 1px solid #3730a3;
+}
+
+.reasoning-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.reasoning-header h2 {
+    color: #c4b5fd;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.reasoning-icon {
+    font-size: 1.5rem;
+}
+
+.toggle-reasoning-btn {
+    background: #6d28d9;
+    border: 1px solid #7c3aed;
+    color: #ffffff;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.toggle-reasoning-btn:hover {
+    background: #7c3aed;
+    border-color: #8b5cf6;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.reasoning-content {
+    animation: slideDown 0.3s ease-out;
+}
+
+.reasoning-steps {
+    background: #0f172a;
+    padding: 1.5rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    color: #e0e7ff;
+    font-size: 1rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.reasoning-steps strong {
+    color: #c4b5fd;
+    font-weight: 600;
+}
+
+.reasoning-steps br {
+    margin-bottom: 0.5rem;
+}
+
 .answer-box {
     background: #1e3a8a;
     padding: 1.5rem;

@@ -1,5 +1,56 @@
 <template>
   <section class="results-section">
+    <!-- Filter Selection Reasoning Section -->
+    <div v-if="result.filter_reasoning" class="filter-reasoning-box">
+      <div class="filter-reasoning-header">
+        <h2>
+          <span class="filter-icon">🔍</span>
+          Document Filter Selection
+        </h2>
+        <div v-if="result.applied_filters" class="applied-filters">
+          <span 
+            v-for="(value, key) in result.applied_filters" 
+            :key="key"
+            class="filter-badge"
+          >
+            {{ key }}: {{ value }}
+          </span>
+        </div>
+        <button 
+          @click="toggleFilterReasoning" 
+          class="toggle-filter-reasoning-btn"
+          :aria-expanded="showFilterReasoning"
+          :title="showFilterReasoning ? 'Hide filter reasoning' : 'Show filter reasoning'"
+        >
+          <span class="expand-icon" :class="{ 'expanded': showFilterReasoning }">▼</span>
+        </button>
+      </div>
+      <div v-if="showFilterReasoning" class="filter-reasoning-content">
+        <div class="filter-reasoning-text" v-html="formattedFilterReasoning"></div>
+      </div>
+    </div>
+
+    <!-- Reasoning Steps Section -->
+    <div v-if="result.reasoning_steps" class="reasoning-box">
+      <div class="reasoning-header">
+        <h2>
+          <span class="reasoning-icon">🧠</span>
+          Reasoning Process
+        </h2>
+        <button 
+          @click="toggleReasoning" 
+          class="toggle-reasoning-btn"
+          :aria-expanded="showReasoning"
+          :title="showReasoning ? 'Hide reasoning' : 'Show reasoning'"
+        >
+          <span class="expand-icon" :class="{ 'expanded': showReasoning }">▼</span>
+        </button>
+      </div>
+      <div v-if="showReasoning" class="reasoning-content">
+        <div class="reasoning-steps" v-html="formattedReasoning"></div>
+      </div>
+    </div>
+
     <div class="answer-box">
       <h2>Answer</h2>
       <div class="answer-content" ref="answerContent" v-html="formattedAnswer"></div>
@@ -72,10 +123,42 @@ export default {
         x: 0,
         y: 0
       },
-      expandedSources: new Set()  // Track which sources are expanded
+      expandedSources: new Set(),  // Track which sources are expanded
+      showReasoning: true,  // Show reasoning by default
+      showFilterReasoning: true  // Show filter reasoning by default
     }
   },
   computed: {
+    formattedFilterReasoning() {
+      if (!this.result?.filter_reasoning) return ''
+      
+      // Format filter reasoning - preserve line breaks and structure
+      let formatted = this.escapeHtml(this.result.filter_reasoning)
+      
+      // Convert step numbers or bullet points to better formatting
+      formatted = formatted.replace(/Step\s+(\d+):/gi, '<strong>Step $1:</strong>')
+      formatted = formatted.replace(/Final\s+Step:/gi, '<strong>Final Step:</strong>')
+      
+      // Preserve line breaks
+      formatted = formatted.replace(/\n/g, '<br>')
+      
+      return formatted
+    },
+    formattedReasoning() {
+      if (!this.result?.reasoning_steps) return ''
+      
+      // Format reasoning steps - preserve line breaks and structure
+      let formatted = this.escapeHtml(this.result.reasoning_steps)
+      
+      // Convert step numbers or bullet points to better formatting
+      formatted = formatted.replace(/Step\s+(\d+):/gi, '<strong>Step $1:</strong>')
+      formatted = formatted.replace(/Final\s+Step:/gi, '<strong>Final Step:</strong>')
+      
+      // Preserve line breaks
+      formatted = formatted.replace(/\n/g, '<br>')
+      
+      return formatted
+    },
     formattedAnswer() {
       if (!this.result?.answer) return ''
       
@@ -170,6 +253,12 @@ export default {
     },
     isExpanded(index) {
       return this.expandedSources.has(index)
+    },
+    toggleReasoning() {
+      this.showReasoning = !this.showReasoning
+    },
+    toggleFilterReasoning() {
+      this.showFilterReasoning = !this.showFilterReasoning
     },
     attachTooltipListeners() {
       if (!this.$refs.answerContent) return
