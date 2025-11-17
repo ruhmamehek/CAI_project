@@ -96,17 +96,17 @@ Question: {query}
 Instructions:
 - Answer the question based solely on the provided context
 - If the context doesn't contain enough information to answer the question, say so
-- Cite specific sources (ticker, filing type, year) when referencing information
+- Cite specific sources (ticker, year) when referencing information
 - Be concise and accurate
 - Use professional financial terminology
 
 IMPORTANT:
 For all information presented in your answer that is drawn from a chunk, cite the chunk from which the information was derived by creating tags around the information. 
 
-Each chunk will have a source header that looks like this:[Source: AAPL 10-K 2023, chunk_id: 1234567890]
+Each chunk will have a source header that looks like this:[Source: AAPL 2023, chunk_id: 1234567890]
 
 For example, if the information is from the 2023 10-K of Apple Inc., the tag should be:
-<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
+<source ticker="AAPL" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
 
 
 Answer:"""
