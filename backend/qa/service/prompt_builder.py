@@ -102,7 +102,7 @@ CRITICAL: Use Chain-of-Thought Reasoning
 For complex questions involving calculations, multi-step analysis, synthesis, or inferential reasoning, you MUST show your reasoning process using the following format:
 
 <thinking>
-Step 1: [Describe what information you need to find first]
+Step 1: [Reflect on the question and what information you need to find first]
 Step 2: [Describe the next step or calculation]
 Step 3: [Continue with subsequent steps]
 ...
@@ -142,9 +142,9 @@ Instructions:
 
 CITATION FORMAT:
 For all information presented in your answer that is drawn from a chunk, cite the chunk using:
-<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> [cited text] </source>
+<source ticker="AAPL" year="2023" chunk_id="1234567890"> [cited text] </source>
 
-Each chunk has a source header: [Source: AAPL 10-K 2023, chunk_id: 1234567890]
+Each chunk has a source header: [Source: AAPL 2023, chunk_id: 1234567890]
 
 Response format:
 <thinking>
@@ -178,13 +178,25 @@ Query: {query}
 Your task:
 1. Identify if a specific company (ticker) is mentioned or implied
 2. Identify if a specific year or time period is mentioned
-3. Identify if a specific filing type (10-K, 10-Q) is mentioned or would be most relevant
-4. Explain your reasoning for each filter decision
+3. Identify if a specific SEC Item number is mentioned (Item 1, Item 1A, Item 2, Item 7, Item 7A, etc.)
+4. Identify if a specific filing type (10-K, 10-Q) is mentioned or would be most relevant
+5. Explain your reasoning for each filter decision
 
 Available filters:
-- ticker: Company ticker symbol (e.g., "AAPL", "MSFT", "GOOGL")
-- year: Fiscal year (e.g., "2023", "2022")
+- ticker: Company ticker symbol (e.g., "AAPL", "MSFT", "GOOGL", "JPM", "JNJ")
+- year: Fiscal year as string (e.g., "2023", "2022", "2024")
+- item_number: SEC Item number (e.g., "1", "1A", "1B", "2", "7", "7A", "8", "9", "10")
 - filing_type: Type of filing ("10-K" for annual, "10-Q" for quarterly)
+
+Common Item numbers:
+- Item 1: Business
+- Item 1A: Risk Factors
+- Item 1B: Unresolved Staff Comments
+- Item 2: Properties
+- Item 3: Legal Proceedings
+- Item 7: Management's Discussion and Analysis
+- Item 7A: Quantitative and Qualitative Disclosures About Market Risk
+- Item 8: Financial Statements and Supplementary Data
 
 Response format (JSON):
 {{
@@ -192,12 +204,14 @@ Response format (JSON):
     "filters": {{
         "ticker": "AAPL" or null,
         "year": "2023" or null,
+        "item_number": "1" or "1A" or "7" or null,
         "filing_type": "10-K" or "10-Q" or null
     }},
     "confidence": 0.0-1.0
 }}
 
 Only include filters that are explicitly mentioned or strongly implied. If uncertain, set to null.
+For item_number, extract the number part only (e.g., "1" for "Item 1", "1A" for "Item 1A").
 Respond with ONLY the JSON object, no additional text."""
 
     @staticmethod

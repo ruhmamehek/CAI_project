@@ -29,7 +29,8 @@ def upload_to_chromadb(
     chunks: List[Dict],
     collection_name: str = "sec_filings",
     embedding_model: str = "BAAI/bge-base-en-v1.5",
-    batch_size: int = 100
+    batch_size: int = 100,
+    replace: bool = True
 ):
     """
     Upload chunks to ChromaDB.
@@ -39,6 +40,7 @@ def upload_to_chromadb(
         collection_name: Name of the ChromaDB collection
         embedding_model: Name of the embedding model to use
         batch_size: Number of chunks to upload per batch
+        replace: If True, replace all existing data in the collection (default: True)
     """
     
     logger.info("Connecting to ChromaDB Cloud...")
@@ -54,21 +56,21 @@ def upload_to_chromadb(
         model_name=embedding_model
     )
     
-    # Get or create collection
-    logger.info(f"Getting/creating collection: {collection_name}")
-    collection = client.get_or_create_collection(
+    # Delete collection if it exists and replace is True
+    if replace:
+        try:
+            client.delete_collection(name=collection_name)
+            logger.info(f"Deleted existing collection: {collection_name}")
+        except Exception as e:
+            logger.debug(f"Collection {collection_name} does not exist or could not be deleted: {e}")
+    
+    # Create collection (will be created if it doesn't exist)
+    logger.info(f"Creating collection: {collection_name}")
+    collection = client.create_collection(
         name=collection_name,
         embedding_function=embedding_fn,
         metadata={"embedding_model": embedding_model}
     )
-    
-    # Check if collection already has data
-    existing_count = collection.count()
-    if existing_count > 0:
-        logger.warning(
-            f"Collection already contains {existing_count} documents. "
-            "New chunks will be added. Consider deleting the collection first if you want to start fresh."
-        )
     
     # Prepare data for upload
     logger.info("Preparing chunks for upload...")
@@ -77,22 +79,39 @@ def upload_to_chromadb(
     metadatas = []
     
     for chunk in chunks:
+        if "text" not in chunk:
+            logger.warning(f"Chunk missing 'text' field, skipping: {chunk.get('chunk_id', 'unknown')}")
+            continue
+        
         texts.append(chunk["text"])
-        ids.append(chunk["chunk_id"])
+        
+        # Generate chunk_id if not present
+        chunk_id = chunk.get("chunk_id")
+        if not chunk_id:
+            ticker_str = chunk.get("ticker", "unknown")
+            year_str = chunk.get("year", "unknown")
+            chunk_id = f"{ticker_str}_{year_str}_chunk_{len(ids)}"
+        ids.append(chunk_id)
         
         # Extract metadata (exclude 'text' and 'chunk_id' as they're handled separately)
         metadata = {
-            "doc_id": chunk.get("doc_id", ""),
             "ticker": chunk.get("ticker", ""),
-            "filing_type": chunk.get("filing_type", ""),
-            "accession_number": chunk.get("accession_number", ""),
-            "year": chunk.get("year", ""),
-            "start_token": chunk.get("start_token", 0),
-            "end_token": chunk.get("end_token", 0),
+            "year": str(chunk.get("year", "")),
+            "item_number": chunk.get("item_number") if chunk.get("item_number") is not None else "",
         }
-        # Convert year to string for ChromaDB (metadata values must be strings, numbers, or bools)
-        if isinstance(metadata["year"], int):
-            metadata["year"] = str(metadata["year"])
+        
+        # Add optional fields if present
+        if "page_number" in chunk:
+            metadata["page_number"] = chunk.get("page_number")
+        if "doc_id" in chunk:
+            metadata["doc_id"] = chunk.get("doc_id", "")
+        if "accession_number" in chunk:
+            metadata["accession_number"] = chunk.get("accession_number", "")
+        if "start_token" in chunk:
+            metadata["start_token"] = chunk.get("start_token", 0)
+        if "end_token" in chunk:
+            metadata["end_token"] = chunk.get("end_token", 0)
+        
         metadatas.append(metadata)
     
     # Upload in batches

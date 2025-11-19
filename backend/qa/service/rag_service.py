@@ -164,28 +164,72 @@ class RAGService:
             logger.error(f"Error during reranking: {e}", exc_info=True)
             return chunks
     
+    def determine_filters(self, query: str) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Analyze query to determine appropriate filters (ticker, year, item_number).
+        
+        Args:
+            query: User query
+            
+        Returns:
+            Tuple of (filters_dict, reasoning) where filters_dict may be None
+        """
+        try:
+            # Build prompt for filter analysis
+            prompt = self.prompt_builder.build_filter_analysis_prompt(query)
+            system_prompt = "You are a financial data retrieval assistant. Analyze queries and determine appropriate filters."
+            
+            # Get LLM response
+            raw_response = self.llm_client.generate(prompt, system_prompt=system_prompt)
+            logger.debug(f"Filter analysis response: {raw_response}")
+            
+            # Parse response
+            filters, reasoning = self.prompt_builder.parse_filter_analysis(raw_response)
+            
+            if filters:
+                logger.info(f"Auto-determined filters: {filters}, reasoning: {reasoning}")
+            
+            return filters, reasoning
+            
+        except Exception as e:
+            logger.warning(f"Error determining filters: {e}", exc_info=True)
+            return None, None
+    
     def query(
         self,
         query: str,
         filters: Optional[Dict[str, Any]] = None,
         top_k: Optional[int] = None,
-        enable_verification: bool = True
+        enable_verification: bool = True,
+        auto_determine_filters: bool = False
     ) -> QueryResponse:
         """
         Complete RAG pipeline: retrieve and generate response.
         
         Args:
             query: User query
-            filters: Metadata filters for retrieval
+            filters: Metadata filters for retrieval (ticker, year, item_number)
             top_k: Number of chunks to retrieve
             enable_verification: Whether to perform verification (default: True)
+            auto_determine_filters: If True and filters not provided, analyze query to determine filters
             
         Returns:
             QueryResponse with answer, sources, and metadata
         """
-        # Retrieve relevant chunks
-        chunks = self.retrieve(query, top_k=top_k, filters=filters)
-        logger.info(f"Retrieved {len(chunks)} chunks")
+        applied_filters = filters
+        filter_reasoning = None
+        
+        # Auto-determine filters if requested and not provided
+        if auto_determine_filters and filters is None:
+            determined_filters, reasoning = self.determine_filters(query)
+            if determined_filters:
+                applied_filters = determined_filters
+                filter_reasoning = reasoning
+                logger.info(f"Auto-determined filters: {applied_filters}")
+        
+        # Retrieve relevant chunks with filters
+        chunks = self.retrieve(query, top_k=top_k, filters=applied_filters)
+        logger.info(f"Retrieved {len(chunks)} chunks with filters: {applied_filters}")
 
         # Rerank chunks
         chunks = self.rerank_chunks(query, chunks, top_k=18)
