@@ -14,7 +14,8 @@ class PromptBuilder:
 - Synthesizing information from multiple sources
 - Connecting quantitative data with qualitative narratives
 - Performing inferential reasoning and projections
-- Identifying patterns, contradictions, and relationships in financial data"""
+- Identifying patterns, contradictions, and relationships in financial data
+- Providing concise and accurate answers with citations"""
     
     @staticmethod
     def build_context(chunks: List[Chunk], max_length: int = 50000) -> str:
@@ -38,7 +39,7 @@ class PromptBuilder:
             metadata = chunk.metadata or {}
             ticker = metadata.get('ticker', 'Unknown')
             year = metadata.get('year', 'Unknown')
-            filing_type = metadata.get('filing_type', 'Unknown')
+            filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
             chunk_id = chunk.chunk_id
             
             # Format chunk with metadata
@@ -90,70 +91,36 @@ class PromptBuilder:
         Returns:
             Formatted prompt
         """
-        return f"""You are a financial analyst assistant. Answer the user's question based on the provided context from SEC filings.
+        return f"""{PromptBuilder.SYSTEM_PROMPT}
 
 Context from SEC filings:
 {context}
 
 Question: {query}
 
-CRITICAL: Use Chain-of-Thought Reasoning
+### STRICT CITATION PROTOCOL
+You are required to provide evidence for every factual statement. Follow these rules:
 
-For complex questions involving calculations, multi-step analysis, synthesis, or inferential reasoning, you MUST show your reasoning process using the following format:
+1. **Granularity:** Every distinct claim must be cited immediately. If a sentence draws from two different chunks, you must insert the relevant citation after each clause.
+2. **Verifiability:** Inside the `<source>` tag, you must include a brief snippet of the text that supports your claim.
+3. **Integrity:** Do not fabricate chunk IDs. Only use the IDs provided in the "Context" section above.
 
-<thinking>
-Step 1: [Reflect on the question and what information you need to find first]
-Step 2: [Describe the next step or calculation]
-Step 3: [Continue with subsequent steps]
-...
-Final Step: [Synthesize the findings]
-</thinking>
+### CITATION FORMAT 
+Use this exact XML format:
+<source ticker="[TICKER]" year="[YEAR]" chunk_id="[ID]">[supporting text from chunk]</source>
 
-<answer>
-[Your final answer with proper citations]
-</answer>
+### EXAMPLE
+**Context Chunk:** <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth.</source>
+<source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D.</source>
 
-Examples of when to use chain-of-thought:
-
-1. **Multi-Step Calculations**: 
-   - "Calculate Net Working Capital for two years"
-   - Show: Step 1: Find Current Assets Year 1, Step 2: Find Current Liabilities Year 1, Step 3: Calculate NWC Year 1, etc.
-
-2. **Synthesis Questions**:
-   - "Compare Gross Margin and Operating Margin trends"
-   - Show: Step 1: Retrieve revenue and COGS, Step 2: Calculate Gross Margin, Step 3: Retrieve Operating Income, Step 4: Calculate Operating Margin, Step 5: Compare trends
-
-3. **Narrative & Risk Analysis**:
-   - "Identify risks and find evidence of materialization"
-   - Show: Step 1: Extract top risks from Risk Factors, Step 2: Search MD&A for evidence, Step 3: Connect quantitative impact
-
-4. **Inferential Reasoning**:
-   - "Calculate debt covenant headroom"
-   - Show: Step 1: Find covenant requirements, Step 2: Retrieve current financial metrics, Step 3: Calculate current ratio, Step 4: Calculate headroom
-
-Instructions:
-- ALWAYS use <thinking> tags for complex questions (calculations, multi-step analysis, synthesis)
-- For simple factual questions, you may skip the thinking section
-- Answer based solely on the provided context
-- If the context doesn't contain enough information, say so in your thinking
-- Cite specific sources using <source> tags (see below)
-- Use professional financial terminology
-- Show all calculations explicitly
-
-CITATION FORMAT:
-For all information presented in your answer that is drawn from a chunk, cite the chunk using:
-<source ticker="AAPL" year="2023" chunk_id="1234567890"> [cited text] </source>
-
-Each chunk has a source header: [Source: AAPL 2023, chunk_id: 1234567890]
+**Correct Response:**
+Microsoft reported a 10% revenue increase driven by their cloud division <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth</source>, while operating expenses grew by 5% specifically due to research and development costs <source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D</source>.
 
 Response format:
-<thinking>
-[Your reasoning steps - only for complex questions]
-</thinking>
-
 <answer>
-[Your final answer with citations]
-</answer>"""
+[Your answer with strict inline citations]
+</answer>
+"""
     
     @staticmethod
     def build_empty_response() -> str:
@@ -179,33 +146,42 @@ Your task:
 1. Identify if a specific company (ticker) is mentioned or implied
 2. Identify if a specific year or time period is mentioned
 3. Identify if a specific SEC Item number is mentioned (Item 1, Item 1A, Item 2, Item 7, Item 7A, etc.)
-4. Identify if a specific filing type (10-K, 10-Q) is mentioned or would be most relevant
-5. Explain your reasoning for each filter decision
+4. Explain your reasoning for each filter decision
+
+Note: All documents are 10-K annual reports, so filing type is not a filter option.
 
 Available filters:
 - ticker: Company ticker symbol (e.g., "AAPL", "MSFT", "GOOGL", "JPM", "JNJ")
 - year: Fiscal year as string (e.g., "2023", "2022", "2024")
 - item_number: SEC Item number (e.g., "1", "1A", "1B", "2", "7", "7A", "8", "9", "10")
-- filing_type: Type of filing ("10-K" for annual, "10-Q" for quarterly)
 
-Common Item numbers:
-- Item 1: Business
-- Item 1A: Risk Factors
-- Item 1B: Unresolved Staff Comments
-- Item 2: Properties
-- Item 3: Legal Proceedings
-- Item 7: Management's Discussion and Analysis
-- Item 7A: Quantitative and Qualitative Disclosures About Market Risk
-- Item 8: Financial Statements and Supplementary Data
+Item Labels & Definitions:
+* **Item 1 (Business):** Core operations, products/services, subsidiaries, markets, and competitive landscape.
+* **Item 1A (Risk Factors):** Significant risks to the company, its industry, or its stock (excluding how they address them).
+* **Item 1B (Unresolved Staff Comments):** Outstanding questions or disputes with the SEC staff.
+* **Item 2 (Properties):** Physical assets, including plants, mines, factories, and real estate.
+* **Item 3 (Legal Proceedings):** Pending lawsuits, litigation, or government legal actions.
+* **Item 5 (Market & Equity):** Stock performance, dividends, share buybacks, and number of shareholders.
+* **Item 6 (Selected Financial Data):** A high-level 5-year summary of financial trends.
+* **Item 7 (MD&A):** Management’s narrative explanation of financial results, liquidity, capital resources, and critical accounting estimates.
+* **Item 7A (Market Risk):** Exposure to external market forces like interest rates, currency exchange, and commodity prices.
+* **Item 8 (Financial Statements):** The official audited Income Statement, Balance Sheet, Cash Flows, and Auditor's Opinion.
+* **Item 9 (Accountant Changes):** Disagreements with auditors or changes in accounting firms.
+* **Item 9A (Controls):** Effectiveness of internal financial controls and disclosure procedures.
+* **Item 10 (Governance):** Directors, executive officers, code of ethics, and board qualifications.
+* **Item 11 (Compensation):** Executive pay, salaries, bonuses, and compensation policies.
+* **Item 12 (Ownership):** Stock ownership by management, directors, and major (>5%) shareholders.
+* **Item 13 (Relationships):** Related party transactions and director independence.
+* **Item 14 (Accountant Fees):** Fees paid to the external auditing firm for services.
+* **Item 15 (Exhibits):** Legal contracts, bylaws, and list of subsidiaries.
 
 Response format (JSON):
 {{
-    "reasoning": "Step-by-step explanation of why each filter was chosen or not chosen",
+    "reasoning": "Brief explanation on the process that led to the filters and why the query fits the filters that have been applied. End off with a list of the filters that have been applied. for exampled: [ticker: AAPL, year: 2023, item_number: 1]",
     "filters": {{
         "ticker": "AAPL" or null,
         "year": "2023" or null,
-        "item_number": "1" or "1A" or "7" or null,
-        "filing_type": "10-K" or "10-Q" or null
+        "item_number": "1" or "1A" or "7" or null
     }},
     "confidence": 0.0-1.0
 }}

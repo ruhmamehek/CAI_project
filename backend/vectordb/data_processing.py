@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 ITEM_PATTERN = re.compile(r'Item\s+(1[0-5]|[1-9][A-Z]?|7A)\b', re.IGNORECASE)
 
 # Allowed types for chunking
-ALLOWED_TYPES = ["Text", "List item", "Table"]
+ALLOWED_TYPES = ["Text", "List item", "Table", "Caption"]
 
 # Types to delete
 DELETE_TYPES = ["Page header", "Page footer"]

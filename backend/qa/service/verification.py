@@ -132,7 +132,7 @@ class RAGVerifier:
                 metadata = chunk.metadata or {}
                 ticker = metadata.get('ticker', 'Unknown')
                 year = metadata.get('year', 'Unknown')
-                filing_type = metadata.get('filing_type', 'Unknown')
+                filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
                 context_parts.append(
                     f"[Source {i+1}: {ticker} {filing_type} {year}]\n{chunk.text[:500]}"
                 )
@@ -243,14 +243,12 @@ JSON response:"""
             metadata = chunk.metadata or {}
             ticker = metadata.get('ticker', '').upper()
             year = metadata.get('year', '')
-            filing_type = metadata.get('filing_type', '').upper()
             
             # Create multiple possible citation patterns
+            # Note: filing_type is not used since all documents are 10-K
             identifiers = [
                 ticker,
                 f"{ticker} {year}",
-                f"{ticker} {filing_type}",
-                f"{ticker} {filing_type} {year}",
                 year
             ]
             source_identifiers.extend([id for id in identifiers if id])
@@ -301,7 +299,7 @@ JSON response:"""
                 metadata = chunk.metadata or {}
                 ticker = metadata.get('ticker', 'Unknown')
                 year = metadata.get('year', 'Unknown')
-                filing_type = metadata.get('filing_type', 'Unknown')
+                filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
                 chunk_id = chunk.chunk_id
                 
                 source_map[i] = {

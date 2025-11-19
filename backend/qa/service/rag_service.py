@@ -232,7 +232,7 @@ class RAGService:
         logger.info(f"Retrieved {len(chunks)} chunks with filters: {applied_filters}")
 
         # Rerank chunks
-        chunks = self.rerank_chunks(query, chunks, top_k=18)
+        chunks = self.rerank_chunks(query, chunks, top_k=10)
         logger.info(f"Reranked {len(chunks)} chunks")
 
         # Generate response (returns answer and reasoning steps)

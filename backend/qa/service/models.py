@@ -14,6 +14,7 @@ class Source:
     score: float
     chunk_id: str
     text: Optional[str] = None  # Optional chunk text content
+    item_number: Optional[str] = None  # SEC Item number (e.g., "1", "1A", "7")
 
 
 @dataclass
@@ -61,7 +62,8 @@ class QueryResponse:
                     "accession_number": source.accession_number,
                     "score": source.score,
                     "chunk_id": source.chunk_id,
-                    "text": source.text
+                    "text": source.text,
+                    "item_number": source.item_number
                 }
                 for source in self.sources
             ],
@@ -89,13 +91,17 @@ class Chunk:
     def to_source(self) -> Source:
         """Convert chunk to Source."""
         metadata = self.metadata or {}
+        item_number = metadata.get('item_number')
+        # Only include item_number if it's not empty
+        item_number = item_number if item_number else None
         return Source(
             ticker=metadata.get('ticker', 'Unknown'),
-            filing_type=metadata.get('filing_type', 'Unknown'),
+            filing_type=metadata.get('filing_type', '10-K'),  # Default to 10-K since all files are 10-K
             year=metadata.get('year', 'Unknown'),
             accession_number=metadata.get('accession_number', 'Unknown'),
             score=self.score,
             chunk_id=self.chunk_id,
-            text=self.text
+            text=self.text,
+            item_number=item_number
         )
 
