@@ -100,7 +100,7 @@ class RAGConfig:
     max_context_length: int = 50000
     rerank_max_length: int = 512  # Max length for cross-encoder reranking (512, 1024, etc.)
     enable_reranking: bool = True  # Whether to enable reranking
-    enable_verification: bool = True  # Whether to enable verification
+    enable_verification: bool = False  # Whether to enable verification
     
     @classmethod
     def from_file(cls, config_path: str = "config.yaml") -> 'RAGConfig':

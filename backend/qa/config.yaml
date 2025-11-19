@@ -13,4 +13,4 @@ llm:
 
 # Verification
 verification:
-  enable: true
+  enable: false

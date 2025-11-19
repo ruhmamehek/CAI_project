@@ -299,18 +299,18 @@ JSON response:"""
                 metadata = chunk.metadata or {}
                 ticker = metadata.get('ticker', 'Unknown')
                 year = metadata.get('year', 'Unknown')
-                filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
+                filing_type = metadata.get('filing_type', 'Unknown')
                 chunk_id = chunk.chunk_id
                 
                 source_map[i] = {
                     "ticker": ticker,
                     "year": year,
-                    "filing_type": filing_type,
+                    # "filing_type": filing_type,
                     "chunk_id": chunk_id
                 }
                 
                 context_parts.append(
-                    f"[Source {i+1}: {ticker} {filing_type} {year}]\n{chunk.text[:800]}"
+                    f"[Source {i+1}: {ticker} {year}]\n{chunk.text[:800]}"
                 )
             
             context = "\n\n".join(context_parts)

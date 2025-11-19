@@ -20,7 +20,8 @@ class SECFilingCleaner:
         min_alphanumeric_ratio: float = 0.3,
         max_metadata_matches: int = 2,
         max_url_count: int = 3,
-        xbrl_line_length_threshold: int = 200
+        xbrl_line_length_threshold: int = 200,
+        max_symbol_ratio: float = 0.35
     ):
         """
         Args:
@@ -41,6 +42,7 @@ class SECFilingCleaner:
         self.max_metadata_matches = max_metadata_matches
         self.max_url_count = max_url_count
         self.xbrl_line_length_threshold = xbrl_line_length_threshold
+        self.max_symbol_ratio = max_symbol_ratio
         
         # Patterns hardcoded because SEC filings follow standardized formats (SEC EDGAR + XBRL taxonomy)
         self.xbrl_patterns = [
@@ -101,6 +103,16 @@ class SECFilingCleaner:
             r'Unless otherwise stated, all information presented herein',
             r'The information contained on the websites.*?is not incorporated by reference',
         ]
+
+        self.gibberish_patterns = [
+            re.compile(r'"?[A-Z0-9]{3,}@'),
+            re.compile(r'\*{4,}'),
+            re.compile(r'_{4,}'),
+            re.compile(r'HHHH'),
+            re.compile(r'ZZZZ'),
+            re.compile(r'\b[A-Z]{3,}\b [A-Z]{3,}\b [A-Z]{3,}'),
+            re.compile(r'X{3,}'),
+        ]
         
     def decode_html_entities(self, text: str) -> str:
         """Decode HTML entities to readable characters."""
@@ -134,6 +146,34 @@ class SECFilingCleaner:
                 continue
             cleaned_lines.append(line)
         
+        return '\n'.join(cleaned_lines)
+
+    def remove_base64_sections(self, text: str) -> str:
+        """
+        Remove base64-like encoded sections that often appear in SEC filings
+        as embedded exhibits.
+        """
+        lines = text.split('\n')
+        cleaned_lines = []
+        buffer = []
+        for line in lines:
+            stripped = line.strip()
+            if len(stripped) >= 60 and re.fullmatch(r'[A-Za-z0-9+/=]+', stripped):
+                buffer.append(line)
+                continue
+            if buffer:
+                # Drop accumulated base64 block if at least 3 lines long
+                if len(buffer) >= 3:
+                    buffer.clear()
+                else:
+                    cleaned_lines.extend(buffer)
+                    buffer.clear()
+            cleaned_lines.append(line)
+
+        if buffer:
+            if len(buffer) < 3:
+                cleaned_lines.extend(buffer)
+
         return '\n'.join(cleaned_lines)
     
     def remove_metadata_sections(self, text: str) -> str:
@@ -232,6 +272,7 @@ class SECFilingCleaner:
         text = self.decode_html_entities(text)
         text = self.remove_html_tags(text)
         text = self.remove_xbrl_content(text)
+        text = self.remove_base64_sections(text)
         text = self.remove_metadata_sections(text)
         text = self.extract_main_content(text)
         text = self.remove_boilerplate_text(text)
@@ -260,6 +301,7 @@ class SECFilingCleaner:
                 continue
             
             alphanumeric_ratio = len(re.findall(r'[a-zA-Z]', text)) / max(len(text), 1)
+            symbol_ratio = len(re.findall(r'[^0-9A-Za-z\s]', text)) / max(len(text), 1)
             
             has_financial_indicators = bool(
                 re.search(r'\$[\d,]+', text) or
@@ -274,6 +316,16 @@ class SECFilingCleaner:
                     continue
                 if re.search(r'us-gaap:|xbrl:|http://fasb\.org', text, re.IGNORECASE):
                     continue
+
+            if symbol_ratio > self.max_symbol_ratio and not has_financial_indicators:
+                continue
+
+            if any(pattern.search(text) for pattern in self.gibberish_patterns):
+                if not has_financial_indicators:
+                    continue
+
+            if alphanumeric_ratio < 0.4 and not has_financial_indicators:
+                continue
             
             metadata_matches = sum(
                 1 for pattern in self.metadata_patterns 

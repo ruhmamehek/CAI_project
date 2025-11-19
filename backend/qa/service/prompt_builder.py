@@ -39,11 +39,12 @@ class PromptBuilder:
             metadata = chunk.metadata or {}
             ticker = metadata.get('ticker', 'Unknown')
             year = metadata.get('year', 'Unknown')
-            filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
+            # filing_type = metadata.get('filing_type', 'Unknown')
             chunk_id = chunk.chunk_id
             
             # Format chunk with metadata
-            header = f"[Source: {ticker} {filing_type} {year}, chunk_id: {chunk_id}]\n"
+            # header = f"[Source: {ticker} {filing_type} {year}, chunk_id: {chunk_id}]\n"
+            header = f"[Source: {ticker} {year}, chunk_id: {chunk_id}]\n"
             chunk_with_meta = header + chunk_text
             chunk_length = len(chunk_with_meta)
             
@@ -98,29 +99,23 @@ Context from SEC filings:
 
 Question: {query}
 
-### STRICT CITATION PROTOCOL
-You are required to provide evidence for every factual statement. Follow these rules:
+Instructions:
+- Answer the question based solely on the provided context
+- If the context doesn't contain enough information to answer the question, say so
+- Cite specific sources (ticker, filing type, year) when referencing information
+- Be concise and accurate
+- Use professional financial terminology
 
-1. **Granularity:** Every distinct claim must be cited immediately. If a sentence draws from two different chunks, you must insert the relevant citation after each clause.
-2. **Verifiability:** Inside the `<source>` tag, you must include a brief snippet of the text that supports your claim.
-3. **Integrity:** Do not fabricate chunk IDs. Only use the IDs provided in the "Context" section above.
+IMPORTANT:
+For all information presented in your answer that is drawn from a chunk, cite the chunk from which the information was derived by creating tags around the information. 
 
-### CITATION FORMAT 
-Use this exact XML format:
-<source ticker="[TICKER]" year="[YEAR]" chunk_id="[ID]">[supporting text from chunk]</source>
+Each chunk will have a source header that looks like this:[Source: AAPL 10-K 2023, chunk_id: 1234567890]
 
-### EXAMPLE
-**Context Chunk:** <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth.</source>
-<source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D.</source>
+For example, if the information is from the 2023 10-K of Apple Inc., the tag should be:
+<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
 
-**Correct Response:**
-Microsoft reported a 10% revenue increase driven by their cloud division <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth</source>, while operating expenses grew by 5% specifically due to research and development costs <source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D</source>.
 
-Response format:
-<answer>
-[Your answer with strict inline citations]
-</answer>
-"""
+Answer:"""
     
     @staticmethod
     def build_empty_response() -> str:
