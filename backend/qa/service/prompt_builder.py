@@ -99,23 +99,29 @@ Context from SEC filings:
 
 Question: {query}
 
-Instructions:
-- Answer the question based solely on the provided context
-- If the context doesn't contain enough information to answer the question, say so
-- Cite specific sources (ticker, filing type, year) when referencing information
-- Be concise and accurate
-- Use professional financial terminology
+### STRICT CITATION PROTOCOL
+You are required to provide evidence for every factual statement. Follow these rules:
 
-IMPORTANT:
-For all information presented in your answer that is drawn from a chunk, cite the chunk from which the information was derived by creating tags around the information. 
+1. **Granularity:** Every distinct claim must be cited immediately. If a sentence draws from two different chunks, you must insert the relevant citation after each clause.
+2. **Verifiability:** Inside the `<source>` tag, you must include a brief snippet of the text that supports your claim.
+3. **Integrity:** Do not fabricate chunk IDs. Only use the IDs provided in the "Context" section above.
 
-Each chunk will have a source header that looks like this:[Source: AAPL 10-K 2023, chunk_id: 1234567890]
+### CITATION FORMAT 
+Use this exact XML format:
+<source ticker="[TICKER]" year="[YEAR]" chunk_id="[ID]">[supporting text from chunk]</source>
 
-For example, if the information is from the 2023 10-K of Apple Inc., the tag should be:
-<source ticker="AAPL" filing_type="10-K" year="2023" chunk_id="1234567890"> Apple Inc. reported a revenue of $100 billion in 2023. </source>
+### EXAMPLE
+**Context Chunk:** <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth.</source>
+<source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D.</source>
 
+**Correct Response:**
+Microsoft reported a 10% revenue increase driven by their cloud division <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth</source>, while operating expenses grew by 5% specifically due to research and development costs <source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D</source>.
 
-Answer:"""
+Response format:
+<answer>
+[Your answer with strict inline citations]
+</answer>
+"""
     
     @staticmethod
     def build_empty_response() -> str:
