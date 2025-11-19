@@ -76,7 +76,6 @@
           <div class="source-header">
             <div class="source-header-left">
               <span class="source-ticker">{{ source.ticker }}</span>
-              <span class="source-filing">{{ source.filing_type }}</span>
               <span class="source-year">{{ source.year }}</span>
               <span v-if="source.item_number" class="source-item-number">Item {{ source.item_number }}</span>
               <span class="source-chunk-id">{{ source.chunk_id }}</span>
@@ -91,9 +90,6 @@
             >
               <span class="expand-icon" :class="{ 'expanded': isExpanded(index) }">▼</span>
             </button>
-          </div>
-          <div class="source-details">
-            <small>Accession: {{ source.accession_number }}</small>
           </div>
           <div 
             v-if="source.text && isExpanded(index)" 
@@ -164,7 +160,7 @@ export default {
       if (!this.result?.answer) return ''
       
       // Regular expression to match <source> tags with all attributes
-      // Matches: <source ticker="AAPL" filing_type="10-Q" year="2023" chunk_id="...">text</source>
+      // Matches: <source ticker="AAPL" year="2023" chunk_id="...">text</source>
       const sourceTagRegex = /<source\s+([^>]+)>([^<]+)<\/source>/gi
       
       let formatted = this.result.answer
@@ -218,7 +214,6 @@ export default {
           const chunkId = attrs.chunk_id || 'Unknown'
           return `<span class="source-highlight" 
                         data-ticker="${this.escapeHtml(attrs.ticker || '')}" 
-                        data-filing-type="${this.escapeHtml(attrs.filing_type || '')}" 
                         data-year="${this.escapeHtml(attrs.year || '')}" 
                         data-chunk-id="${this.escapeHtml(chunkId)}">${this.escapeHtml(part.content)}</span>`
         } else {
@@ -233,17 +228,22 @@ export default {
       div.textContent = text
       return div.innerHTML
     },
-    showTooltip(event, chunkId, ticker, filingType, year) {
-      const tooltipText = `Chunk ID: ${chunkId} | Source: ${ticker} ${filingType} ${year}`
-      this.tooltip = {
-        visible: true,
-        text: tooltipText,
-        x: event.clientX + 10,
-        y: event.clientY + 10
-      }
+    showTooltip(event, chunkId, ticker, year) {
+      const tooltipText = `Chunk ID: ${chunkId} | Source: ${ticker} ${year}`
+      this.tooltip.visible = true
+      this.tooltip.text = tooltipText
+      this.tooltip.x = event.clientX + 10
+      this.tooltip.y = event.clientY + 10
     },
     hideTooltip() {
       this.tooltip.visible = false
+    },
+    updateTooltipPosition(event) {
+      // Only update position, don't change visibility to avoid re-renders
+      if (this.tooltip.visible) {
+        this.tooltip.x = event.clientX + 10
+        this.tooltip.y = event.clientY + 10
+      }
     },
     toggleSource(index) {
       if (this.expandedSources.has(index)) {
@@ -264,32 +264,49 @@ export default {
     attachTooltipListeners() {
       if (!this.$refs.answerContent) return
       
-      const highlights = this.$refs.answerContent.querySelectorAll('.source-highlight')
-      highlights.forEach(span => {
-        // Remove existing listeners to avoid duplicates
-        const newSpan = span.cloneNode(true)
-        span.parentNode.replaceChild(newSpan, span)
-        
-        // Get data attributes
-        const chunkId = newSpan.getAttribute('data-chunk-id') || 'Unknown'
-        const ticker = newSpan.getAttribute('data-ticker') || 'Unknown'
-        const filingType = newSpan.getAttribute('data-filing-type') || ''
-        const year = newSpan.getAttribute('data-year') || ''
-        
-        // Attach event listeners
-        newSpan.addEventListener('mouseenter', (e) => {
-          this.showTooltip(e, chunkId, ticker, filingType, year)
-        })
-        newSpan.addEventListener('mouseleave', () => {
-          this.hideTooltip()
-        })
-        newSpan.addEventListener('mousemove', (e) => {
-          if (this.tooltip.visible) {
-            this.tooltip.x = e.clientX + 10
-            this.tooltip.y = e.clientY + 10
+      // Use event delegation on the parent container instead of individual elements
+      // This prevents flickering because we don't need to re-attach listeners
+      const container = this.$refs.answerContent
+      
+      // Remove existing listener if any
+      if (container._tooltipHandler) {
+        container.removeEventListener('mouseover', container._tooltipHandler)
+        container.removeEventListener('mouseout', container._tooltipHandler)
+        container.removeEventListener('mousemove', container._tooltipHandler)
+      }
+      
+      // Create a single handler for event delegation
+      container._tooltipHandler = (e) => {
+        const target = e.target.closest('.source-highlight')
+        if (!target) {
+          // If mouse leaves a highlight and doesn't enter another, hide tooltip
+          if (e.type === 'mouseout' && !e.relatedTarget?.closest('.source-highlight')) {
+            this.hideTooltip()
           }
-        })
-      })
+          return
+        }
+        
+        // Get data attributes from the target
+        const chunkId = target.getAttribute('data-chunk-id') || 'Unknown'
+        const ticker = target.getAttribute('data-ticker') || 'Unknown'
+        const year = target.getAttribute('data-year') || ''
+        
+        if (e.type === 'mouseover') {
+          this.showTooltip(e, chunkId, ticker, year)
+        } else if (e.type === 'mouseout') {
+          // Only hide if we're leaving the highlight entirely (not entering another)
+          if (!e.relatedTarget?.closest('.source-highlight')) {
+            this.hideTooltip()
+          }
+        } else if (e.type === 'mousemove') {
+          this.updateTooltipPosition(e)
+        }
+      }
+      
+      // Attach event listeners to container using event delegation
+      container.addEventListener('mouseover', container._tooltipHandler, true)
+      container.addEventListener('mouseout', container._tooltipHandler, true)
+      container.addEventListener('mousemove', container._tooltipHandler)
     }
   },
   mounted() {
@@ -298,9 +315,23 @@ export default {
     })
   },
   updated() {
-    this.$nextTick(() => {
-      this.attachTooltipListeners()
-    })
+    // Only re-attach if the container exists and doesn't have handlers yet
+    // This prevents unnecessary re-attachment during tooltip position updates
+    if (this.$refs.answerContent && !this.$refs.answerContent._tooltipHandler) {
+      this.$nextTick(() => {
+        this.attachTooltipListeners()
+      })
+    }
+  },
+  beforeDestroy() {
+    // Clean up event listeners
+    if (this.$refs.answerContent && this.$refs.answerContent._tooltipHandler) {
+      const container = this.$refs.answerContent
+      container.removeEventListener('mouseover', container._tooltipHandler)
+      container.removeEventListener('mouseout', container._tooltipHandler)
+      container.removeEventListener('mousemove', container._tooltipHandler)
+      container._tooltipHandler = null
+    }
   }
 }
 </script>
