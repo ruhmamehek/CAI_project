@@ -13,12 +13,15 @@ class ChromaDBConfig:
     api_key: str
     tenant: str
     database: str
-    collection_name: str = "sec_filings"
+    collection_name: str = "isaac_test_filings"
     embedding_model: str = "BAAI/bge-base-en-v1.5"
     
     @classmethod
     def from_env(cls, collection_name: Optional[str] = None, embedding_model: Optional[str] = None) -> 'ChromaDBConfig':
-        """Create ChromaDBConfig from environment variables."""
+        """Create ChromaDBConfig from environment variables.
+        
+        Note: collection_name should be provided from config.yaml, not environment variables.
+        """
         api_key = os.getenv('CHROMA_API_KEY')
         tenant = os.getenv('CHROMA_TENANT')
         database = os.getenv('CHROMA_DATABASE')
@@ -29,11 +32,17 @@ class ChromaDBConfig:
                 "CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE"
             )
         
+        if not collection_name:
+            raise ValueError(
+                "Collection name must be provided. It should be read from config.yaml, "
+                "not from environment variables."
+            )
+        
         return cls(
             api_key=api_key,
             tenant=tenant,
             database=database,
-            collection_name=collection_name or "sec_filings",
+            collection_name=collection_name,
             embedding_model=embedding_model or "BAAI/bge-base-en-v1.5"
         )
 
@@ -119,8 +128,38 @@ class RAGConfig:
         verification_config = yaml_config.get('verification', {})
         enable_verification = verification_config.get('enable', os.getenv('ENABLE_VERIFICATION', 'true').lower() == 'true')
         
+        # Get collection name from YAML config (required)
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        chroma_config = yaml_config.get('chroma', {})
+        if not chroma_config:
+            logger.error(f"Config file structure: {list(yaml_config.keys())}")
+            raise ValueError(
+                "No 'chroma' section found in config.yaml. "
+                "Please add a 'chroma' section with 'collection_name' to your config.yaml file."
+            )
+        
+        collection_name = chroma_config.get('collection_name')
+        
+        # Handle empty string or None
+        if not collection_name or (isinstance(collection_name, str) and not collection_name.strip()):
+            logger.error(f"Chroma config keys: {list(chroma_config.keys())}")
+            logger.error(f"Collection name value: {repr(collection_name)}")
+            raise ValueError(
+                "Collection name not found or empty in config.yaml. "
+                "Please ensure 'chroma.collection_name' is set to a non-empty value in your config.yaml file."
+            )
+        
+        # Strip whitespace if it's a string
+        if isinstance(collection_name, str):
+            collection_name = collection_name.strip()
+        
+        # Log which collection name is being used
+        logger.info(f"Using ChromaDB collection name from config.yaml: {collection_name}")
+        
         chroma = ChromaDBConfig.from_env(
-            collection_name="sec_filings",
+            collection_name=collection_name,
             embedding_model=embedding_model
         )
         llm = LLMConfig.from_env()
@@ -139,7 +178,30 @@ class RAGConfig:
     @classmethod
     def from_env(cls) -> 'RAGConfig':
         """Create RAGConfig from environment variables only."""
-        chroma = ChromaDBConfig.from_env()
+        # Try to read collection name from default config.yaml first
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        collection_name = None
+        default_config_path = Path("config.yaml")
+        if default_config_path.exists():
+            try:
+                with open(default_config_path, 'r') as f:
+                    yaml_config = yaml.safe_load(f)
+                chroma_config = yaml_config.get('chroma', {})
+                collection_name = chroma_config.get('collection_name')
+                if collection_name:
+                    logger.info(f"Using ChromaDB collection name from config.yaml: {collection_name}")
+            except Exception as e:
+                logger.warning(f"Could not read collection name from config.yaml: {e}")
+        
+        if not collection_name:
+            raise ValueError(
+                "Collection name not found. Please ensure 'chroma.collection_name' is set in config.yaml. "
+                "The from_env() method requires a config.yaml file with the collection name specified."
+            )
+        
+        chroma = ChromaDBConfig.from_env(collection_name=collection_name)
         llm = LLMConfig.from_env()
         top_k = int(os.getenv('RAG_TOP_K', '20'))
         rerank_max_length = int(os.getenv('RERANK_MAX_LENGTH', '512'))

@@ -16,7 +16,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Default values
 INPUT_DIR="$PROJECT_ROOT/data/layout-parser"
-COLLECTION_NAME="sec_filings"
+COLLECTION_NAME="isaac_test_filings"
 EMBEDDING_MODEL="BAAI/bge-base-en-v1.5"
 BATCH_SIZE=100
 VERBOSE=false

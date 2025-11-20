@@ -376,6 +376,28 @@ def extract_item_number_from_section_header(text: str) -> Optional[str]:
     return None
 
 
+def add_chunk_metadata_tag(chunk: Dict) -> None:
+    """
+    Add metadata tag to the beginning of chunk text.
+    
+    Format: [Ticker="TSLA", Year="2024", Chunk_id="TSLA_2024_chunk_90"]
+    
+    Args:
+        chunk: Chunk dictionary with 'text', 'ticker', 'year', and 'chunk_id' fields
+    """
+    if 'text' not in chunk:
+        return
+    
+    ticker = chunk.get('ticker', 'unknown')
+    year = chunk.get('year', 'unknown')
+    chunk_id = chunk.get('chunk_id', 'unknown')
+    
+    tag = f'[Ticker="{ticker}", Year="{year}", Chunk_id="{chunk_id}"]'
+    
+    # Prepend tag to existing text
+    chunk['text'] = tag + ' ' + chunk['text']
+
+
 def process_picture_objects(
     picture_objects: List[Dict],
     ticker: Optional[str] = None,
@@ -724,7 +746,7 @@ def process_json_file(
     input_path: Path, 
     output_path: Optional[Path] = None,
     upload_to_chromadb_flag: bool = False,
-    collection_name: str = "sec_filings",
+    collection_name: str = "isaac_test_filings",
     embedding_model: str = "BAAI/bge-base-en-v1.5",
     batch_size: int = 100
 ) -> Dict:
@@ -799,6 +821,10 @@ def process_json_file(
             ticker_str = chunk.get('ticker', 'unknown')
             year_str = chunk.get('year', 'unknown')
             chunk['chunk_id'] = f"{ticker_str}_{year_str}_chunk_{idx}"
+    
+    # Add metadata tag to the beginning of each chunk's text
+    for chunk in processed_data:
+        add_chunk_metadata_tag(chunk)
     
     # Save processed JSON
     with open(output_path, 'w', encoding='utf-8') as f:

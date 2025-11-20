@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from typing import Optional
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -34,9 +35,13 @@ CORS(app)
 rag_service: RAGService = None
 
 
-def init_rag_service(config_path: str = "config.yaml"):
+def init_rag_service(config_path: Optional[str] = None):
     """Initialize global RAG service from config file."""
     global rag_service
+    
+    # Default to config.yaml in the same directory as this file (backend/qa/config.yaml)
+    if config_path is None:
+        config_path = str(Path(__file__).parent / 'config.yaml')
     
     try:
         config = load_config(config_path)
@@ -173,7 +178,8 @@ def serve_image(image_path):
 
 
 if __name__ == '__main__':
-    default_config = Path(__file__).parent.parent.parent / 'config.yaml'
+    # Default to config.yaml in the same directory as this file (backend/qa/config.yaml)
+    default_config = Path(__file__).parent / 'config.yaml'
     config_path = os.getenv('CONFIG_PATH', str(default_config))
     init_rag_service(config_path)
     

@@ -326,6 +326,17 @@ def upload_to_chromadb(
             "page": page_value,
         }
         
+        # Add item_number if present (important for SEC filing sections)
+        item_number = chunk.get("item_number")
+        if item_number is not None and str(item_number).strip():
+            metadata["item_number"] = str(item_number).strip()
+        
+        # Preserve positioning metadata (left, top, width, height, page_width, page_height)
+        for coord_key in ["left", "top", "width", "height", "page_width", "page_height"]:
+            if coord_key in chunk and chunk.get(coord_key) is not None:
+                # Convert to string for ChromaDB metadata
+                metadata[coord_key] = str(chunk[coord_key])
+        
         # Store image_path for all image types (Table, Figure, Picture)
         if chunk_type in ["Table", "Figure", "Picture"]:
             if "image_path" in chunk:
@@ -349,11 +360,12 @@ def upload_to_chromadb(
             if "y_2" in coords:
                 metadata["y_2"] = coords["y_2"]
         
+        # Convert numeric metadata fields to strings (ChromaDB requirement)
         if isinstance(metadata.get("year"), int):
             metadata["year"] = str(metadata["year"])
         if isinstance(metadata.get("page"), (int, float)):
             metadata["page"] = str(int(metadata["page"]))
-        for coord_key in ["x_1", "y_1", "x_2", "y_2"]:
+        for coord_key in ["x_1", "y_1", "x_2", "y_2", "left", "top", "width", "height", "page_width", "page_height"]:
             if coord_key in metadata and isinstance(metadata[coord_key], (int, float)):
                 metadata[coord_key] = str(metadata[coord_key])
         for size_key in ["image_width", "image_height"]:

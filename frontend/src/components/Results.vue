@@ -55,6 +55,100 @@
       <h2>Answer</h2>
       <div class="answer-content" ref="answerContent" v-html="formattedAnswer"></div>
     </div>
+
+    <!-- Verification Section -->
+    <div v-if="result.verification" class="verification-box">
+      <div class="verification-header">
+        <h2>
+          <span class="verification-icon">✓</span>
+          Verification Results
+        </h2>
+        <button 
+          @click="toggleVerification" 
+          class="toggle-verification-btn"
+          :aria-expanded="showVerification"
+          :title="showVerification ? 'Hide verification' : 'Show verification'"
+        >
+          <span class="expand-icon" :class="{ 'expanded': showVerification }">▼</span>
+        </button>
+      </div>
+      <div v-if="showVerification" class="verification-content">
+        <!-- Overall Score -->
+        <div class="verification-score">
+          <div class="score-label">Overall Verification Score:</div>
+          <div class="score-value" :class="getScoreClass(result.verification.overall_score)">
+            {{ (result.verification.overall_score * 100).toFixed(1) }}%
+          </div>
+        </div>
+
+        <!-- Verified Numbers -->
+        <div v-if="result.verification.verified_numbers && result.verification.verified_numbers.length > 0" class="verified-numbers-section">
+          <h3 class="section-title verified-title">
+            <span class="check-icon">✓</span>
+            Verified Numbers ({{ result.verification.verified_numbers.length }})
+          </h3>
+          <div class="numbers-list">
+            <span 
+              v-for="(number, index) in result.verification.verified_numbers" 
+              :key="index"
+              class="number-badge verified-number"
+            >
+              {{ formatNumber(number) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Unverified Claims -->
+        <div v-if="result.verification.unverified_claims && result.verification.unverified_claims.length > 0" class="unverified-claims-section">
+          <h3 class="section-title unverified-title">
+            <span class="warning-icon">⚠</span>
+            Unverified Claims ({{ result.verification.unverified_claims.length }})
+          </h3>
+          <ul class="claims-list">
+            <li 
+              v-for="(claim, index) in result.verification.unverified_claims" 
+              :key="index"
+              class="claim-item"
+            >
+              {{ claim }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- Verification Details -->
+        <div class="verification-details">
+          <div class="detail-item">
+            <span class="detail-label">Answer-Source Alignment:</span>
+            <span class="detail-value">{{ (result.verification.answer_source_alignment * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Citation Coverage:</span>
+            <span class="detail-value">{{ (result.verification.citation_coverage * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Fact Verification Score:</span>
+            <span class="detail-value">{{ (result.verification.fact_verification_score * 100).toFixed(1) }}%</span>
+          </div>
+        </div>
+
+        <!-- Issues -->
+        <div v-if="result.verification.issues && result.verification.issues.length > 0" class="issues-section">
+          <h3 class="section-title issues-title">
+            <span class="info-icon">ℹ</span>
+            Issues
+          </h3>
+          <ul class="issues-list">
+            <li 
+              v-for="(issue, index) in result.verification.issues" 
+              :key="index"
+              class="issue-item"
+            >
+              {{ issue }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
     
     <div 
       v-if="tooltip.visible" 
@@ -135,6 +229,7 @@ export default {
       expandedSources: new Set(),  // Track which sources are expanded
       showReasoning: true,  // Show reasoning by default
       showFilterReasoning: true,  // Show filter reasoning by default
+      showVerification: true,  // Show verification by default
       apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000'
     }
   },
@@ -266,6 +361,31 @@ export default {
     },
     toggleFilterReasoning() {
       this.showFilterReasoning = !this.showFilterReasoning
+    },
+    toggleVerification() {
+      this.showVerification = !this.showVerification
+    },
+    formatNumber(number) {
+      // Format number with commas and handle large numbers
+      if (number >= 1e9) {
+        return `$${(number / 1e9).toFixed(2)}B`
+      } else if (number >= 1e6) {
+        return `$${(number / 1e6).toFixed(2)}M`
+      } else if (number >= 1e3) {
+        return `$${(number / 1e3).toFixed(2)}K`
+      } else {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2
+        }).format(number)
+      }
+    },
+    getScoreClass(score) {
+      if (score >= 0.8) return 'score-high'
+      if (score >= 0.6) return 'score-medium'
+      return 'score-low'
     },
     getImageUrl(imagePath) {
       if (!imagePath) return ''

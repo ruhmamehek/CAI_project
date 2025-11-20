@@ -1,3 +1,7 @@
+# ChromaDB configuration
+chroma:
+  collection_name: "isaac_test_filings"
+
 # Retrieval
 retrieval:
   dense:
@@ -13,4 +17,4 @@ llm:
 
 # Verification
 verification:
-  enable: false
+  enable: true

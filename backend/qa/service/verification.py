@@ -2,13 +2,390 @@
 
 import logging
 import re
-from typing import List, Dict, Any, Optional
+import math
+from typing import List, Dict, Any, Optional, Set
 from dataclasses import dataclass
 
 from .models import Chunk, Source
-from .llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
+
+
+class FinancialVerifier:
+    """Code-based verifier for financial numbers in text."""
+    
+    def __init__(self):
+        """
+        Initialize financial verifier with regex patterns.
+        
+        Includes noise patterns to filter out dates, years, and other
+        non-financial numbers before extraction.
+        """
+        # 1. NOISE PATTERNS: Patterns to IGNORE (Mask out) before extraction
+        self.noise_patterns = [
+            # Years (1900-2030) standing alone (not preceded by $)
+            # Expanded to catch more variations
+            re.compile(r'(?<!\$)\b(?:19|20)\d{2}\b'),
+            
+            # Dates with month names (Dec 31, 2022, December 31, 2022, Dec. 31, 2022)
+            re.compile(r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}', re.IGNORECASE),
+            
+            # Dates with ordinal numbers (December 31st, 2022, 31st of December 2022)
+            re.compile(r'\d{1,2}(?:st|nd|rd|th)\s+(?:of\s+)?(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4}', re.IGNORECASE),
+            re.compile(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th),?\s+\d{4}', re.IGNORECASE),
+            
+            # Date formats: MM/DD/YYYY, DD/MM/YYYY, YYYY-MM-DD, MM-DD-YYYY
+            re.compile(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b'),
+            re.compile(r'\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b'),  # YYYY-MM-DD format
+            
+            # Quarter references (Q1 2023, Q1'23, 1Q23)
+            re.compile(r'\bQ[1-4]\s*\d{2,4}\b', re.IGNORECASE),
+            re.compile(r'\b\d{1}[Qq]\s*\d{2,4}\b', re.IGNORECASE),
+            
+            # Fiscal year references (FY 2023, FY2023, fiscal year 2023)
+            re.compile(r'\b(?:FY|F\.Y\.)\s*\d{2,4}\b', re.IGNORECASE),
+            re.compile(r'\bfiscal\s+year\s+\d{2,4}\b', re.IGNORECASE),
+            
+            # Time references (2023, 2022-2023, 2023 vs 2022)
+            re.compile(r'\b\d{4}\s*[-–—]\s*\d{4}\b'),  # Year ranges with various dashes
+            re.compile(r'\b\d{4}\s+(?:vs|versus|vs\.|compared to)\s+\d{4}\b', re.IGNORECASE),
+            
+            # SEC Headers (Item 1A, Note 4, Part II, Table 1, Figure 2)
+            re.compile(r'\b(?:Item|Note|Part|Form|Table|Figure|Fig\.|Tab\.)\s+\d+[A-Z]?\b', re.IGNORECASE),
+            re.compile(r'10-K|10-Q|8-K|Form\s+10', re.IGNORECASE),  # Filing types
+            
+            # Page numbers and references (Page 5, p. 10, pp. 20-30)
+            re.compile(r'\b(?:Page|p\.|pp\.)\s+\d+(?:[-–—]\d+)?\b', re.IGNORECASE),
+            
+            # Phone numbers / CIK / Zip Codes
+            re.compile(r'\b\d{5}(?:-\d{4})?\b'),  # Zip codes (but only if not preceded by $)
+            re.compile(r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b'),  # Phone numbers
+            re.compile(r'CIK[:\s]+\d+', re.IGNORECASE),  # CIK numbers
+            
+            # Common date phrases (end of year, beginning of year, etc.)
+            re.compile(r'\b(?:as of|at the end of|beginning of|as at)\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', re.IGNORECASE),
+        ]
+        
+        # Date-related context words that indicate a number might be a date
+        self.date_context_words = {
+            'month', 'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december',
+            'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+            'day', 'week', 'quarter', 'year', 'fiscal', 'period',
+            'ended', 'ending', 'beginning', 'start', 'date', 'dated',
+            'filed', 'filing', 'report', 'quarterly', 'annual'
+        }
+        
+        # 2. VALUE PATTERN: The actual financial extraction
+        # Balanced approach: captures financial numbers but filters noise in post-processing
+        self.number_pattern = re.compile(
+            r'('
+            # Case A: Currency ($1,000 or $ 1000 or (1,000) for negative)
+            # This will match: $1,234.56, ($1,234), $1.5M, ($100 million)
+            r'\(?\-?\$?\s?\d{1,3}(?:,\d{3})*(?:\.\d+)?\s?(?:million|billion|trillion|M|B|T)?\)?'
+            r'|'
+            # Case A2: Currency with $ and no commas ($100, $1234.56)
+            r'\$\s?\d+\.?\d*\s?(?:million|billion|trillion|M|B|T)?'
+            r'|'
+            # Case B: Explicit Scale (10.5 million, 15B, 1.2M)
+            r'\d+\.?\d*\s?(?:million|billion|trillion|M|B|T)'
+            r'|'
+            # Case C: Percentages (5.5%, 500 bps) - CRITICAL for Audit
+            r'\d+(?:\.\d+)?\s?%|\d+(?:\.\d+)?\s?bps'
+            r')',
+            re.IGNORECASE
+        )
+    
+    def _clean_noise(self, text: str) -> str:
+        """
+        Removes dates, years, and citations to prevent false positives.
+        
+        Uses multiple passes and context-aware filtering.
+        
+        Args:
+            text: Text to clean
+            
+        Returns:
+            Cleaned text with noise patterns replaced by whitespace
+        """
+        cleaned_text = text
+        
+        # First pass: Remove known date patterns
+        for pattern in self.noise_patterns:
+            # Replace noise with whitespace to preserve word boundaries
+            cleaned_text = pattern.sub(' ', cleaned_text)
+        
+        # Second pass: Remove standalone years (1900-2030) that might have been missed
+        # But preserve years that are part of financial values
+        # Look for years that are NOT preceded by $ or followed by financial terms
+        year_pattern = re.compile(
+            r'(?<!\$)(?<!\d)\b(?:19|20)\d{2}\b(?!\s*(?:million|billion|trillion|M|B|T|%|percent))',
+            re.IGNORECASE
+        )
+        cleaned_text = year_pattern.sub(' ', cleaned_text)
+        
+        return cleaned_text
+    
+    def _is_likely_date_context(self, text: str, match_start: int, match_end: int, window: int = 30) -> bool:
+        """
+        Check if a number appears in date-related context.
+        
+        More lenient - only flags very clear date contexts.
+        
+        Args:
+            text: Full text
+            match_start: Start position of matched number
+            match_end: End position of matched number
+            window: Number of characters before/after to check (reduced for precision)
+            
+        Returns:
+            True if number appears in very clear date context
+        """
+        # Extract context around the match
+        context_start = max(0, match_start - window)
+        context_end = min(len(text), match_end + window)
+        context = text[context_start:context_end].lower()
+        
+        # Check for very specific date-related phrases near the number
+        # Only flag if we see clear date phrases
+        strong_date_indicators = [
+            r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}',  # Month + day
+            r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}',  # Full date pattern
+            r'\bfiscal\s+year',  # Fiscal year
+            r'\bfiled\s+on',  # Filed on
+            r'\bended\s+(?:december|january)',  # Ended December
+            r'\b(as of|at the end of|beginning of)\s+\d{1,2}',  # As of date
+        ]
+        
+        for pattern in strong_date_indicators:
+            if re.search(pattern, context, re.IGNORECASE):
+                return True
+        
+        # Check for date-related words immediately adjacent (within 10 chars)
+        immediate_context_start = max(0, match_start - 10)
+        immediate_context_end = min(len(text), match_end + 10)
+        immediate_context = text[immediate_context_start:immediate_context_end].lower()
+        
+        immediate_date_words = {'january', 'february', 'march', 'april', 'may', 'june',
+                               'july', 'august', 'september', 'october', 'november', 'december',
+                               'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'}
+        
+        immediate_words = set(re.findall(r'\b\w+\b', immediate_context))
+        if immediate_date_words & immediate_words:
+            return True
+        
+        return False
+    
+    def _is_likely_date_number(self, value: float, match_str: str) -> bool:
+        """
+        Check if an extracted number is likely a date component.
+        
+        More lenient - only filters obvious dates without financial context.
+        
+        Args:
+            value: Normalized numeric value
+            match_str: Original matched string
+            
+        Returns:
+            True if number looks like a date component
+        """
+        # Only filter out years 1900-2030 if they have NO financial context at all
+        # This is more lenient - only filter if completely without financial markers
+        if 1900 <= value <= 2030:
+            # Only filter if it has NO financial context indicators
+            has_currency = '$' in match_str
+            has_scale = any(scale in match_str.lower() for scale in ['million', 'billion', 'trillion', 'm', 'b', 't'])
+            has_percentage = '%' in match_str or 'bps' in match_str.lower()
+            has_negative = '(' in match_str and ')' in match_str
+            has_comma = ',' in match_str  # Likely part of larger number
+            
+            # Only filter if it has absolutely no financial indicators
+            if not (has_currency or has_scale or has_percentage or has_negative or has_comma):
+                return True  # Likely a year
+        
+        # Don't filter days of month - they're often part of financial dates
+        # and the context checking will handle it
+        
+        return False
+    
+    def _normalize_financial_value(self, raw_str: str) -> Optional[float]:
+        """
+        Converts financial strings into comparable floats.
+        
+        Handles:
+        - "$ (10,200.50)" -> -10200.50
+        - "$1.5 million" -> 1500000.0
+        - "15B" -> 15000000000.0
+        - "1.2M" -> 1200000.0
+        - "5.5%" -> 0.055
+        - "100 bps" -> 0.01
+        
+        Args:
+            raw_str: Raw string containing number
+            
+        Returns:
+            Normalized float value or None if parsing fails
+        """
+        clean_str = raw_str.strip().lower()
+        
+        # Handle Percentages
+        is_percentage = False
+        is_bps = False
+        if '%' in clean_str:
+            is_percentage = True
+            clean_str = clean_str.replace('%', '')
+            multiplier = 0.01  # 5% -> 0.05
+        elif 'bps' in clean_str:
+            is_bps = True
+            clean_str = clean_str.replace('bps', '')
+            multiplier = 0.0001  # 100 bps -> 0.01
+        else:
+            multiplier = 1.0
+        
+        # Check for parentheses indicating negative (Common in SEC filings)
+        is_negative = False
+        if '(' in clean_str and ')' in clean_str:
+            is_negative = True
+            # Remove parentheses
+            clean_str = clean_str.replace('(', '').replace(')', '')
+        
+        # Extract scale multiplier (million, billion, etc.)
+        scale_patterns = {
+            'trillion': 1e12,
+            't': 1e12,
+            'billion': 1e9,
+            'b': 1e9,
+            'million': 1e6,
+            'm': 1e6,
+        }
+        
+        for scale, mult in scale_patterns.items():
+            if scale in clean_str:
+                multiplier *= mult  # Multiply the existing multiplier
+                # Remove scale text
+                clean_str = re.sub(rf'\s?{scale}', '', clean_str, flags=re.IGNORECASE)
+                break
+        
+        # Remove currency symbols and other non-numeric chars except dots and negative signs
+        numeric_str = re.sub(r'[^\d\.\-]', '', clean_str)
+        
+        if not numeric_str or numeric_str == '.' or numeric_str == '-':
+            return None
+        
+        try:
+            val = float(numeric_str)
+            
+            # Apply negative logic (but not for percentages/bps - they're relative)
+            if not is_percentage and not is_bps:
+                if is_negative or (val > 0 and '-' in raw_str.lower()):
+                    val = -abs(val)
+            
+            # Apply multiplier
+            val = val * multiplier
+            
+            return val
+        except ValueError:
+            return None
+    
+    def extract_values(self, text: str) -> Set[float]:
+        """
+        Extracts all financial numbers from text as a set of floats.
+        
+        First cleans noise (dates, years, etc.) to prevent false positives,
+        then extracts financial numbers and filters out date-like numbers.
+        
+        Args:
+            text: Text to extract numbers from
+            
+        Returns:
+            Set of normalized float values
+        """
+        # 1. Pre-process: Remove dates and headers
+        sanitized_text = self._clean_noise(text)
+        
+        # 2. Extract financial numbers with position information
+        values = set()
+        
+        # Find all matches with their positions
+        for match_obj in self.number_pattern.finditer(sanitized_text):
+            match_str = match_obj.group(0)
+            match_start = match_obj.start()
+            match_end = match_obj.end()
+            
+            # If match is tuple (from regex groups), take first element
+            if isinstance(match_str, tuple):
+                match_str = match_str[0]
+            
+            # Normalize the value first
+            norm = self._normalize_financial_value(match_str)
+            if norm is None:
+                continue
+            
+            # Post-extraction filtering: Check if normalized value looks like a date
+            # Only filter if it's very clearly a date (e.g., years 1900-2030 without financial context)
+            if self._is_likely_date_number(norm, match_str):
+                # Double-check context before filtering
+                if self._is_likely_date_context(sanitized_text, match_start, match_end):
+                    continue  # Skip this match - clearly a date
+            
+            values.add(norm)
+        
+        return values
+    
+    def verify(self, generated_text: str, source_text: str) -> Dict[str, Any]:
+        """
+        Verifies that every number in the generated text exists in the source.
+        
+        Args:
+            generated_text: Text from generated response
+            source_text: Text from source context
+            
+        Returns:
+            Dictionary with verification results
+        """
+        gen_values = self.extract_values(generated_text)
+        src_values = self.extract_values(source_text)
+        
+        if not gen_values:
+            # No numbers in generated text - can't verify numerically
+            return {
+                "verified": True,
+                "error": None,
+                "missing_values": [],
+                "verified_values": [],
+                "score": 1.0
+            }
+        
+        missing = []
+        verified = []
+        
+        for g_val in gen_values:
+            # Use isclose for float comparison (tolerates small precision errors)
+            # any() checks if g_val matches ANY number in the source set
+            match_found = any(math.isclose(g_val, s_val, rel_tol=1e-9, abs_tol=1.0) for s_val in src_values)
+            
+            if not match_found:
+                missing.append(g_val)
+            else:
+                verified.append(g_val)
+        
+        if missing:
+            score = max(0.0, 1.0 - (len(missing) / len(gen_values)))
+            return {
+                "verified": False,
+                "error": f"Verification Failed. The following values in the response were not found in context: {missing}",
+                "missing_values": missing,
+                "verified_values": verified,
+                "score": score
+            }
+        
+        return {
+            "verified": True,
+            "error": None,
+            "missing_values": [],
+            "verified_values": verified,
+            "score": 1.0
+        }
 
 
 @dataclass
@@ -21,6 +398,7 @@ class VerificationResult:
     issues: List[str]  # List of identified issues
     verified_sources: List[str]  # List of source IDs that support the answer
     unverified_claims: List[str]  # Claims that couldn't be verified
+    verified_numbers: List[float]  # List of numbers that were verified in the answer
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -31,21 +409,22 @@ class VerificationResult:
             "fact_verification_score": self.fact_verification_score,
             "issues": self.issues,
             "verified_sources": self.verified_sources,
-            "unverified_claims": self.unverified_claims
+            "unverified_claims": self.unverified_claims,
+            "verified_numbers": self.verified_numbers
         }
 
 
 class RAGVerifier:
-    """Verifier for RAG responses."""
+    """Verifier for RAG responses using code-based verification."""
     
-    def __init__(self, llm_client: LLMClient):
+    def __init__(self, llm_client=None):
         """
         Initialize RAG verifier.
         
         Args:
-            llm_client: LLM client for verification tasks
+            llm_client: Optional LLM client (kept for backward compatibility, not used)
         """
-        self.llm_client = llm_client
+        self.financial_verifier = FinancialVerifier()
     
     def verify(
         self,
@@ -72,7 +451,8 @@ class RAGVerifier:
                 fact_verification_score=0.0,
                 issues=["No sources retrieved"],
                 verified_sources=[],
-                unverified_claims=[]
+                unverified_claims=[],
+                verified_numbers=[]
             )
         
         # Perform various verification checks
@@ -103,7 +483,8 @@ class RAGVerifier:
             fact_verification_score=fact_verification["score"],
             issues=issues,
             verified_sources=fact_verification["verified_sources"],
-            unverified_claims=fact_verification["unverified_claims"]
+            unverified_claims=fact_verification["unverified_claims"],
+            verified_numbers=fact_verification.get("verified_numbers", [])
         )
     
     def _check_answer_source_alignment(
@@ -113,85 +494,39 @@ class RAGVerifier:
         query: str
     ) -> float:
         """
-        Check if answer aligns with retrieved sources.
+        Check if answer aligns with retrieved sources using number verification.
         
-        Uses LLM to evaluate semantic alignment.
+        Uses code-based financial number verification to check if numbers in
+        the answer are grounded in the source context.
         
         Args:
             answer: Generated answer
             chunks: Retrieved chunks
-            query: Original query
+            query: Original query (not used in code-based verification)
             
         Returns:
             Alignment score between 0.0 and 1.0
         """
+        if not chunks:
+            return 0.0
+        
         try:
-            # Build context from top chunks
-            context_parts = []
-            for i, chunk in enumerate(chunks[:5]):  # Use top 5 chunks
-                metadata = chunk.metadata or {}
-                ticker = metadata.get('ticker', 'Unknown')
-                year = metadata.get('year', 'Unknown')
-                filing_type = metadata.get('filing_type', '10-K')  # Default to 10-K since all files are 10-K
-                context_parts.append(
-                    f"[Source {i+1}: {ticker} {filing_type} {year}]\n{chunk.text[:500]}"
-                )
+            # Combine all chunk texts into source context
+            source_text = ' '.join(chunk.text for chunk in chunks[:10])
             
-            context = "\n\n".join(context_parts)
+            # Verify numbers in answer against source
+            verification_result = self.financial_verifier.verify(answer, source_text)
             
-            # Use LLM to evaluate alignment
-            prompt = f"""You are a verification assistant. Evaluate whether the given answer is well-supported by the provided sources.
-
-Query: {query}
-
-Sources:
-{context}
-
-Answer to verify:
-{answer}
-
-Evaluate:
-1. Does the answer address the query?
-2. Is the information in the answer supported by the sources?
-3. Are there any contradictions between the answer and sources?
-
-Respond with a JSON object containing:
-- "score": a float between 0.0 and 1.0 (1.0 = fully supported, 0.0 = not supported)
-- "reasoning": brief explanation
-
-JSON response:"""
+            # Base score on number verification
+            number_score = verification_result.get("score", 0.5)
             
-            response = self.llm_client.generate(prompt)
+            # Also check keyword overlap for non-numeric alignment
+            keyword_score = self._simple_alignment_check(answer, chunks)
             
-            # Extract JSON from response
-            import json
-            # Try to find JSON object in response (handle nested objects)
-            # Look for content between first { and last }
-            start_idx = response.find('{')
-            if start_idx != -1:
-                # Find matching closing brace
-                brace_count = 0
-                end_idx = start_idx
-                for i in range(start_idx, len(response)):
-                    if response[i] == '{':
-                        brace_count += 1
-                    elif response[i] == '}':
-                        brace_count -= 1
-                        if brace_count == 0:
-                            end_idx = i + 1
-                            break
-                
-                if end_idx > start_idx:
-                    try:
-                        json_str = response[start_idx:end_idx]
-                        result = json.loads(json_str)
-                        score = float(result.get("score", 0.5))
-                        return max(0.0, min(1.0, score))  # Clamp between 0 and 1
-                    except (json.JSONDecodeError, ValueError, TypeError):
-                        pass
+            # Weighted combination: 60% number verification, 40% keyword overlap
+            alignment_score = (number_score * 0.6) + (keyword_score * 0.4)
             
-            # Fallback: simple keyword matching
-            return self._simple_alignment_check(answer, chunks)
+            return max(0.0, min(1.0, alignment_score))
             
         except Exception as e:
             logger.warning(f"Error in answer-source alignment check: {e}. Using fallback.")
@@ -282,7 +617,7 @@ JSON response:"""
     
     def _verify_facts(self, answer: str, chunks: List[Chunk]) -> Dict[str, Any]:
         """
-        Extract and verify facts/claims from the answer.
+        Verify facts/claims from the answer using code-based number verification.
         
         Args:
             answer: Generated answer
@@ -292,119 +627,50 @@ JSON response:"""
             Dictionary with verification results
         """
         try:
-            # Build context from chunks
-            context_parts = []
-            source_map = {}  # Map chunk index to source info
-            for i, chunk in enumerate(chunks[:10]):  # Use top 10 chunks
-                metadata = chunk.metadata or {}
-                ticker = metadata.get('ticker', 'Unknown')
-                year = metadata.get('year', 'Unknown')
-                filing_type = metadata.get('filing_type', 'Unknown')
-                chunk_id = chunk.chunk_id
-                
-                source_map[i] = {
-                    "ticker": ticker,
-                    "year": year,
-                    # "filing_type": filing_type,
-                    "chunk_id": chunk_id
+            if not chunks:
+                return {
+                    "score": 0.0,
+                    "verified_sources": [],
+                    "unverified_claims": []
                 }
-                
-                context_parts.append(
-                    f"[Source {i+1}: {ticker} {year}]\n{chunk.text[:800]}"
-                )
             
-            context = "\n\n".join(context_parts)
+            # Combine all chunk texts into source context
+            source_text = ' '.join(chunk.text for chunk in chunks[:10])
             
-            # Use LLM to extract and verify facts
-            prompt = f"""You are a fact verification assistant. Extract key factual claims from the answer and verify them against the sources.
-
-Sources:
-{context}
-
-Answer to verify:
-{answer}
-
-Task:
-1. Extract 1-5 key factual claims from the answer
-2. For each claim, check if it's supported by the sources
-3. Identify which source(s) support each claim (use Source number)
-
-Respond with a JSON object:
-{{
-    "claims": [
-        {{
-            "claim": "the factual claim text",
-            "verified": true/false,
-            "supporting_sources": [1, 2],  // source numbers
-            "confidence": 0.0-1.0
-        }}
-    ]
-}}
-
-JSON response:"""
+            # Verify numbers in answer against source
+            verification_result = self.financial_verifier.verify(answer, source_text)
             
-            response = self.llm_client.generate(prompt)
+            # Extract verified and unverified numbers
+            missing_values = verification_result.get("missing_values", [])
+            verified_values = verification_result.get("verified_values", [])
+            score = verification_result.get("score", 0.5)
             
-            # Extract JSON from response
-            import json
-            # Try to find JSON object in response (handle nested objects)
-            start_idx = response.find('{')
-            if start_idx != -1:
-                # Find matching closing brace
-                brace_count = 0
-                end_idx = start_idx
-                for i in range(start_idx, len(response)):
-                    if response[i] == '{':
-                        brace_count += 1
-                    elif response[i] == '}':
-                        brace_count -= 1
-                        if brace_count == 0:
-                            end_idx = i + 1
-                            break
-                
-                if end_idx > start_idx:
-                    try:
-                        json_str = response[start_idx:end_idx]
-                        result = json.loads(json_str)
-                        claims = result.get("claims", [])
-                        
-                        if not claims:
-                            return {
-                                "score": 0.5,
-                                "verified_sources": [],
-                                "unverified_claims": []
-                            }
-                        
-                        verified_count = sum(1 for claim in claims if claim.get("verified", False))
-                        verified_sources = []
-                        unverified_claims = []
-                        
-                        for claim in claims:
-                            if claim.get("verified", False):
-                                source_nums = claim.get("supporting_sources", [])
-                                for src_num in source_nums:
-                                    if src_num in source_map:
-                                        chunk_id = source_map[src_num]["chunk_id"]
-                                        if chunk_id not in verified_sources:
-                                            verified_sources.append(chunk_id)
-                            else:
-                                unverified_claims.append(claim.get("claim", ""))
-                        
-                        score = verified_count / len(claims) if claims else 0.0
-                        
-                        return {
-                            "score": score,
-                            "verified_sources": verified_sources,
-                            "unverified_claims": unverified_claims
-                        }
-                    except (json.JSONDecodeError, ValueError, TypeError):
-                        pass
+            # Identify which chunks contain the verified numbers
+            verified_sources = []
+            unverified_claims = []
             
-            # Fallback
+            if missing_values:
+                # Format missing values as unverified claims
+                for val in missing_values:
+                    unverified_claims.append(f"Number {val} not found in sources")
+            
+            # Find chunks that contain verified numbers
+            answer_values = self.financial_verifier.extract_values(answer)
+            
+            # For each verified number, find which chunks contain it
+            verified_numbers_set = set(verified_values)
+            for chunk in chunks:
+                chunk_values = self.financial_verifier.extract_values(chunk.text)
+                # Check if this chunk contains any verified numbers
+                if verified_numbers_set & chunk_values:
+                    if chunk.chunk_id not in verified_sources:
+                        verified_sources.append(chunk.chunk_id)
+            
             return {
-                "score": 0.5,
-                "verified_sources": [],
-                "unverified_claims": []
+                "score": score,
+                "verified_sources": verified_sources,
+                "unverified_claims": unverified_claims,
+                "verified_numbers": verified_values
             }
             
         except Exception as e:
@@ -412,6 +678,7 @@ JSON response:"""
             return {
                 "score": 0.5,
                 "verified_sources": [],
-                "unverified_claims": []
+                "unverified_claims": [],
+                "verified_numbers": []
             }
 

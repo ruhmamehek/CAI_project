@@ -10,10 +10,10 @@ services:
       - PORT=8000
       - FLASK_DEBUG=false
       # ChromaDB configuration (override with .env file)
+      # Note: collection_name is read from config.yaml, not environment variables
       - CHROMA_API_KEY=${CHROMA_API_KEY}
       - CHROMA_TENANT=${CHROMA_TENANT}
       - CHROMA_DATABASE=${CHROMA_DATABASE}
-      - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-sec_filings}
       # LLM configuration
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
       - GEMINI_API_KEY=${GEMINI_API_KEY}

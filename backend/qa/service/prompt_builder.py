@@ -10,13 +10,14 @@ logger = logging.getLogger(__name__)
 class PromptBuilder:
     """Builder for RAG prompts."""
     
-    SYSTEM_PROMPT = """You are an expert financial analyst assistant with deep expertise in SEC filings, financial statements, and corporate analysis. You excel at:
+    SYSTEM_PROMPT = """You are an expert financial analyst assistant with deep expertise in SEC 10-K filings, financial statements, and corporate analysis. You excel at:
 - Multi-step calculations and financial analysis
 - Synthesizing information from multiple sources
 - Connecting quantitative data with qualitative narratives
 - Performing inferential reasoning and projections
 - Identifying patterns, contradictions, and relationships in financial data
-- Providing concise and accurate answers with citations"""
+- Providing concise and accurate answers with citations
+- You only have access to the SEC 10-K filings and the financial statements of the company"""
     
     @staticmethod
     def build_context(chunks: List[Chunk], max_length: int = 50000) -> str:
@@ -75,7 +76,7 @@ class PromptBuilder:
         """
         return f"""{PromptBuilder.SYSTEM_PROMPT}
 
-Context from SEC filings:
+Context from SEC 10-K filings:
 {context}
 
 Question: {query}
@@ -83,20 +84,16 @@ Question: {query}
 ### STRICT CITATION PROTOCOL
 You are required to provide evidence for every factual statement. Follow these rules:
 
-1. **Granularity:** Every distinct claim must be cited immediately. If a sentence draws from two different chunks, you must insert the relevant citation after each clause.
-2. **Verifiability:** Inside the `<source>` tag, you must include a brief snippet of the text that supports your claim.
+1. **Granularity:** Every distinct claim must be cited in line. If a sentence draws from two different chunks, you must pick the more directly relevant chunk and cite it. The context provided will start each chunk with a tag in brackets that will contain its chunk information. For example: [Ticker="TSLA", Year="2024", Chunk_id="TSLA_2024_chunk_90"]
+2. **Verifiability:** Inside the `<source>` tag, you must include the text that supports your claim. Keep it narrow to the factual material that is drawn straight from the chunk.
 3. **Integrity:** Do not fabricate chunk IDs. Only use the IDs provided in the "Context" section above.
 
 ### CITATION FORMAT 
 Use this exact XML format:
 <source ticker="[TICKER]" year="[YEAR]" chunk_id="[ID]">[supporting text from chunk]</source>
 
-### EXAMPLE
-**Context Chunk:** <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth.</source>
-<source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D.</source>
-
 **Correct Response:**
-Microsoft reported a 10% revenue increase driven by their cloud division <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth</source>, while operating expenses grew by 5% specifically due to research and development costs <source ticker="MSFT" year="2023" chunk_id="8822">Operating expenses rose 5% driven by R&D</source>.
+Microsoft reported a <source ticker="MSFT" year="2023" chunk_id="8821">Revenue increased by 10% due to cloud growth</source>, while operating expenses <source ticker="MSFT" year="2023" chunk_id="8822">grew by 5% specifically due to research and development costs</source>.
 
 Response format:
 <answer>
