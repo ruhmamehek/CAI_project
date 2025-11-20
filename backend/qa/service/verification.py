@@ -494,13 +494,13 @@ class RAGVerifier:
         query: str
     ) -> float:
         """
-        Check if answer aligns with retrieved sources using number verification.
+        Check if answer aligns with retrieved sources using source tag-based verification.
         
-        Uses code-based financial number verification to check if numbers in
-        the answer are grounded in the source context.
+        Parses source tags and verifies that numbers in cited sections match their
+        corresponding chunks, and that uncited numbers are found in any source.
         
         Args:
-            answer: Generated answer
+            answer: Generated answer with source tags
             chunks: Retrieved chunks
             query: Original query (not used in code-based verification)
             
@@ -511,25 +511,67 @@ class RAGVerifier:
             return 0.0
         
         try:
-            # Combine all chunk texts into source context
-            source_text = ' '.join(chunk.text for chunk in chunks[:10])
+            # Parse source tags from answer
+            source_sections, uncited_text = self._parse_source_tags(answer)
             
-            # Verify numbers in answer against source
-            verification_result = self.financial_verifier.verify(answer, source_text)
+            if not source_sections and not uncited_text:
+                return 0.0
             
-            # Base score on number verification
-            number_score = verification_result.get("score", 0.5)
+            total_numbers = 0
+            verified_numbers = 0
             
-            # Also check keyword overlap for non-numeric alignment
-            keyword_score = self._simple_alignment_check(answer, chunks)
+            # Verify each source-tagged section
+            for source_section in source_sections:
+                chunk_id = source_section['chunk_id']
+                cited_text = source_section['text']
+                
+                # Find the corresponding chunk
+                chunk = self._find_chunk_by_id(chunk_id, chunks)
+                
+                if not chunk:
+                    # Chunk not found - count all numbers as unverified
+                    cited_numbers = self.financial_verifier.extract_values(cited_text)
+                    total_numbers += len(cited_numbers)
+                    continue
+                
+                # Extract chunk text (remove metadata tag)
+                chunk_text = self._extract_chunk_text_from_context(chunk.text)
+                
+                # Extract numbers from cited text and chunk text
+                cited_numbers = self.financial_verifier.extract_values(cited_text)
+                chunk_numbers = self.financial_verifier.extract_values(chunk_text)
+                
+                total_numbers += len(cited_numbers)
+                verified_numbers += len(cited_numbers & chunk_numbers)
             
-            # Weighted combination: 60% number verification, 40% keyword overlap
-            alignment_score = (number_score * 0.6) + (keyword_score * 0.4)
+            # Verify uncited text against all chunks combined
+            if uncited_text:
+                uncited_numbers = self.financial_verifier.extract_values(uncited_text)
+                total_numbers += len(uncited_numbers)
+                
+                if uncited_numbers:
+                    # Combine all chunk texts for verification
+                    all_chunk_texts = []
+                    for chunk in chunks:
+                        chunk_text = self._extract_chunk_text_from_context(chunk.text)
+                        all_chunk_texts.append(chunk_text)
+                    combined_source = ' '.join(all_chunk_texts)
+                    
+                    # Verify uncited numbers
+                    combined_numbers = self.financial_verifier.extract_values(combined_source)
+                    verified_numbers += len(uncited_numbers & combined_numbers)
+            
+            # Calculate alignment score
+            if total_numbers == 0:
+                # No numbers to verify - score based on whether sources are cited
+                alignment_score = 1.0 if source_sections else 0.5
+            else:
+                alignment_score = verified_numbers / total_numbers if total_numbers > 0 else 0.5
             
             return max(0.0, min(1.0, alignment_score))
             
         except Exception as e:
-            logger.warning(f"Error in answer-source alignment check: {e}. Using fallback.")
+            logger.warning(f"Error in answer-source alignment check: {e}. Using fallback.", exc_info=True)
             return self._simple_alignment_check(answer, chunks)
     
     def _simple_alignment_check(self, answer: str, chunks: List[Chunk]) -> float:
@@ -615,12 +657,119 @@ class RAGVerifier:
         
         return min(explicit_citations + pattern_bonus, 1.0)
     
-    def _verify_facts(self, answer: str, chunks: List[Chunk]) -> Dict[str, Any]:
+    def _parse_source_tags(self, answer: str) -> tuple[List[Dict[str, Any]], str]:
         """
-        Verify facts/claims from the answer using code-based number verification.
+        Parse answer to extract source-tagged sections and uncited text.
         
         Args:
-            answer: Generated answer
+            answer: Generated answer with source tags
+            
+        Returns:
+            Tuple of (source_sections, uncited_text) where:
+            - source_sections: List of dicts with 'ticker', 'year', 'chunk_id', 'text'
+            - uncited_text: Text outside of source tags
+        """
+        import re
+        
+        source_sections = []
+        uncited_parts = []
+        
+        # Pattern to match <source ticker="..." year="..." chunk_id="...">...</source>
+        source_pattern = re.compile(
+            r'<source\s+ticker="([^"]+)"\s+year="([^"]+)"\s+chunk_id="([^"]+)">(.*?)</source>',
+            re.DOTALL | re.IGNORECASE
+        )
+        
+        last_end = 0
+        for match in source_pattern.finditer(answer):
+            # Add text before this source tag to uncited
+            if match.start() > last_end:
+                uncited_parts.append(answer[last_end:match.start()])
+            
+            # Extract source tag information
+            ticker = match.group(1)
+            year = match.group(2)
+            chunk_id = match.group(3)
+            text = match.group(4).strip()
+            
+            source_sections.append({
+                'ticker': ticker,
+                'year': year,
+                'chunk_id': chunk_id,
+                'text': text
+            })
+            
+            last_end = match.end()
+        
+        # Add remaining text after last source tag
+        if last_end < len(answer):
+            uncited_parts.append(answer[last_end:])
+        
+        uncited_text = ' '.join(uncited_parts).strip()
+        
+        return source_sections, uncited_text
+    
+    def _find_chunk_by_id(self, chunk_id: str, chunks: List[Chunk]) -> Optional[Chunk]:
+        """
+        Find a chunk by its chunk_id.
+        
+        Args:
+            chunk_id: Chunk ID to find
+            chunks: List of chunks to search
+            
+        Returns:
+            Chunk if found, None otherwise
+        """
+        for chunk in chunks:
+            if chunk.chunk_id == chunk_id:
+                return chunk
+        return None
+    
+    def _extract_chunk_text_from_context(self, chunk_text: str) -> str:
+        """
+        Extract the actual chunk text, removing the metadata tag.
+        
+        The chunk text may start with either:
+        - [Ticker="...", Year="...", Chunk_id="..."] (from ChromaDB)
+        - [Source: ... chunk_id: ...] (from prompt builder context)
+        
+        We need to extract the text after this tag.
+        
+        Args:
+            chunk_text: Full chunk text with metadata tag
+            
+        Returns:
+            Chunk text without metadata tag
+        """
+        import re
+        
+        # Pattern 1: [Ticker="...", Year="...", Chunk_id="..."]
+        ticker_pattern = re.compile(
+            r'\[Ticker="[^"]+",\s*Year="[^"]+",\s*Chunk_id="[^"]+"\]\s*',
+            re.IGNORECASE
+        )
+        
+        # Pattern 2: [Source: ... chunk_id: ...]
+        source_pattern = re.compile(
+            r'\[Source:[^\]]+\]\s*',
+            re.IGNORECASE
+        )
+        
+        # Try to remove metadata tag (try both patterns)
+        cleaned_text = ticker_pattern.sub('', chunk_text, count=1)
+        cleaned_text = source_pattern.sub('', cleaned_text, count=1)
+        
+        return cleaned_text.strip()
+    
+    def _verify_facts(self, answer: str, chunks: List[Chunk]) -> Dict[str, Any]:
+        """
+        Verify facts/claims from the answer using source tag-based verification.
+        
+        Parses source tags in the answer, extracts numbers from cited and uncited text,
+        and verifies that numbers in source tags match the corresponding chunks.
+        
+        Args:
+            answer: Generated answer with source tags
             chunks: Retrieved chunks
             
         Returns:
@@ -631,50 +780,107 @@ class RAGVerifier:
                 return {
                     "score": 0.0,
                     "verified_sources": [],
-                    "unverified_claims": []
+                    "unverified_claims": [],
+                    "verified_numbers": []
                 }
             
-            # Combine all chunk texts into source context
-            source_text = ' '.join(chunk.text for chunk in chunks[:10])
+            # Parse source tags from answer
+            source_sections, uncited_text = self._parse_source_tags(answer)
             
-            # Verify numbers in answer against source
-            verification_result = self.financial_verifier.verify(answer, source_text)
-            
-            # Extract verified and unverified numbers
-            missing_values = verification_result.get("missing_values", [])
-            verified_values = verification_result.get("verified_values", [])
-            score = verification_result.get("score", 0.5)
-            
-            # Identify which chunks contain the verified numbers
             verified_sources = []
             unverified_claims = []
+            all_verified_numbers = []
             
-            if missing_values:
-                # Format missing values as unverified claims
-                for val in missing_values:
-                    unverified_claims.append(f"Number {val} not found in sources")
+            # Verify each source-tagged section
+            for source_section in source_sections:
+                chunk_id = source_section['chunk_id']
+                cited_text = source_section['text']
+                
+                # Find the corresponding chunk
+                chunk = self._find_chunk_by_id(chunk_id, chunks)
+                
+                if not chunk:
+                    unverified_claims.append(
+                        f"Chunk ID {chunk_id} not found in retrieved sources"
+                    )
+                    continue
+                
+                # Extract chunk text (remove metadata tag)
+                chunk_text = self._extract_chunk_text_from_context(chunk.text)
+                
+                # Extract numbers from cited text and chunk text
+                cited_numbers = self.financial_verifier.extract_values(cited_text)
+                chunk_numbers = self.financial_verifier.extract_values(chunk_text)
+                
+                # Verify numbers in cited text exist in chunk
+                missing_in_chunk = cited_numbers - chunk_numbers
+                verified_in_chunk = cited_numbers & chunk_numbers
+                
+                if missing_in_chunk:
+                    for num in missing_in_chunk:
+                        unverified_claims.append(
+                            f"Number {num} in citation for chunk {chunk_id} not found in source chunk"
+                        )
+                
+                if verified_in_chunk:
+                    all_verified_numbers.extend(verified_in_chunk)
+                    if chunk_id not in verified_sources:
+                        verified_sources.append(chunk_id)
             
-            # Find chunks that contain verified numbers
-            answer_values = self.financial_verifier.extract_values(answer)
+            # Also verify uncited text against all chunks combined
+            if uncited_text:
+                uncited_numbers = self.financial_verifier.extract_values(uncited_text)
+                
+                if uncited_numbers:
+                    # Combine all chunk texts for verification
+                    all_chunk_texts = []
+                    for chunk in chunks:
+                        chunk_text = self._extract_chunk_text_from_context(chunk.text)
+                        all_chunk_texts.append(chunk_text)
+                    combined_source = ' '.join(all_chunk_texts)
+                    
+                    # Verify uncited numbers
+                    combined_numbers = self.financial_verifier.extract_values(combined_source)
+                    missing_uncited = uncited_numbers - combined_numbers
+                    
+                    if missing_uncited:
+                        for num in missing_uncited:
+                            unverified_claims.append(
+                                f"Number {num} in uncited text not found in any source"
+                            )
+                    
+                    # Add verified uncited numbers
+                    verified_uncited = uncited_numbers & combined_numbers
+                    all_verified_numbers.extend(verified_uncited)
             
-            # For each verified number, find which chunks contain it
-            verified_numbers_set = set(verified_values)
-            for chunk in chunks:
-                chunk_values = self.financial_verifier.extract_values(chunk.text)
-                # Check if this chunk contains any verified numbers
-                if verified_numbers_set & chunk_values:
-                    if chunk.chunk_id not in verified_sources:
-                        verified_sources.append(chunk.chunk_id)
+            # Calculate score based on verification results
+            total_cited_numbers = sum(
+                len(self.financial_verifier.extract_values(section['text']))
+                for section in source_sections
+            )
+            total_uncited_numbers = len(self.financial_verifier.extract_values(uncited_text)) if uncited_text else 0
+            total_numbers = total_cited_numbers + total_uncited_numbers
+            
+            if total_numbers == 0:
+                # No numbers to verify - score based on whether sources are cited
+                score = 1.0 if source_sections else 0.5
+            else:
+                # Score based on proportion of verified numbers
+                verified_count = len(all_verified_numbers)
+                score = verified_count / total_numbers if total_numbers > 0 else 0.5
+            
+            # Remove duplicates from verified_numbers
+            unique_verified_numbers = list(set(all_verified_numbers))
             
             return {
                 "score": score,
                 "verified_sources": verified_sources,
                 "unverified_claims": unverified_claims,
-                "verified_numbers": verified_values
+                "verified_numbers": unique_verified_numbers
             }
             
         except Exception as e:
-            logger.warning(f"Error in fact verification: {e}")
+            logger.warning(f"Error in fact verification: {e}", exc_info=True)
             return {
                 "score": 0.5,
                 "verified_sources": [],

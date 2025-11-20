@@ -165,7 +165,7 @@ Response format (JSON):
     "confidence": 0.0-1.0
 }}
 
-Only include filters that are explicitly mentioned or strongly implied. If uncertain, set to null.
+Only include filters that are explicitly mentioned or strongly implied. If uncertain or multiple filters are mentioned, set to null.
 For item_number, extract the number part only (e.g., "1" for "Item 1", "1A" for "Item 1A").
 Respond with ONLY the JSON object, no additional text."""
 
