@@ -146,7 +146,7 @@ if __name__ == '__main__':
     init_rag_service(config_path)
     
     # Run Flask app
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
     logger.info(f"Starting Flask server on port {port}")
