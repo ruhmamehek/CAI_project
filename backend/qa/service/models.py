@@ -3,17 +3,20 @@
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
+from .utils import clean_image_text
+
 
 @dataclass
 class Source:
     """Source information for a retrieved chunk."""
     ticker: str
-    # filing_type: str
     year: str
-    accession_number: str
     score: float
     chunk_id: str
-    text: Optional[str] = None  # Optional chunk text content
+    chunk_type: str = "Text"
+    page: int = 0
+    image_path: Optional[str] = None
+    text: Optional[str] = None
     item_number: Optional[str] = None  # SEC Item number (e.g., "1", "1A", "7")
 
 
@@ -57,11 +60,12 @@ class QueryResponse:
             "sources": [
                 {
                     "ticker": source.ticker,
-                    # "filing_type": source.filing_type,
                     "year": source.year,
-                    "accession_number": source.accession_number,
                     "score": source.score,
                     "chunk_id": source.chunk_id,
+                    "chunk_type": source.chunk_type,
+                    "page": source.page,
+                    "image_path": source.image_path,
                     "text": source.text,
                     "item_number": source.item_number
                 }
@@ -94,14 +98,16 @@ class Chunk:
         item_number = metadata.get('item_number')
         # Only include item_number if it's not empty
         item_number = item_number if item_number else None
+        cleaned_text = clean_image_text(self.text)
+        
         return Source(
             ticker=metadata.get('ticker', 'Unknown'),
-            # filing_type=metadata.get('filing_type', '10-K'),  # Default to 10-K since all files are 10-K
             year=metadata.get('year', 'Unknown'),
-            accession_number=metadata.get('accession_number', 'Unknown'),
             score=self.score,
             chunk_id=self.chunk_id,
-            text=self.text,
+            chunk_type=metadata.get('type', 'Text'),
+            page=int(metadata.get('page', 0)) if metadata.get('page') else 0,
+            image_path=metadata.get('image_path') or metadata.get('filename'),
+            text=cleaned_text,
             item_number=item_number
         )
-

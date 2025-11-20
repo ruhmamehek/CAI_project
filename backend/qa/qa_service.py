@@ -4,35 +4,38 @@ import os
 import sys
 import logging
 from pathlib import Path
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
-
-load_dotenv() 
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
-
-from service import RAGService, load_config, QueryRequest
+from service.utils import get_project_root, is_path_safe, get_image_mime_type
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+env_paths = [
+    Path(__file__).parent.parent.parent.resolve() / '.env',
+    Path(__file__).parent.parent.resolve() / '.env',
+    Path(__file__).parent.resolve() / '.env',
+]
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+        break
+else:
+    load_dotenv(override=True)
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from service import RAGService, load_config, QueryRequest
+
 app = Flask(__name__)
-# Enable CORS for all routes (allows frontend to communicate with backend)
 CORS(app)
 
-# Global RAG service instance
 rag_service: RAGService = None
 
 
 def init_rag_service(config_path: str = "config.yaml"):
-    """
-    Initialize global RAG service from config file.
-    
-    Args:
-        config_path: Path to config YAML file
-    """
+    """Initialize global RAG service from config file."""
     global rag_service
     
     try:
@@ -61,11 +64,9 @@ def query():
         if not data:
             return jsonify({"error": "Request body is required"}), 400
         
-        # Create request model
         query_request = QueryRequest.from_dict(data)
         query_request.validate()
         
-        # Check if verification should be enabled (default: True)
         enable_verification = data.get('enable_verification', True)
         
         # Check if auto filter determination should be enabled (default: True)
@@ -93,7 +94,7 @@ def query():
 
 @app.route('/retrieve', methods=['POST'])
 def retrieve():
-    """Retrieve chunks without generating response (for debugging)."""
+    """Retrieve chunks without generating response."""
     if rag_service is None:
         return jsonify({"error": "RAG service not initialized"}), 500
     
@@ -109,10 +110,8 @@ def retrieve():
         filters = data.get('filters')
         top_k = data.get('top_k')
         
-        # Retrieve chunks
         chunks = rag_service.retrieve(query=query_text, filters=filters, top_k=top_k)
         
-        # Convert chunks to dictionaries
         chunks_dict = [
             {
                 "text": chunk.text,
@@ -147,15 +146,38 @@ def collection_info():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/images/<path:image_path>', methods=['GET'])
+def serve_image(image_path):
+    """Serve images from the data directory."""
+    try:
+        project_root = get_project_root()
+        full_path = project_root / image_path
+        
+        if not is_path_safe(full_path, project_root):
+            logger.warning(f"Attempted to access path outside project root: {image_path}")
+            return jsonify({"error": "Invalid image path"}), 403
+        
+        if not full_path.exists():
+            logger.warning(f"Image not found: {full_path}")
+            return jsonify({"error": "Image not found"}), 404
+        
+        mime_type = get_image_mime_type(full_path.suffix)
+        if not mime_type:
+            return jsonify({"error": "Not an image file"}), 400
+        
+        return send_file(str(full_path), mimetype=mime_type)
+    
+    except Exception as e:
+        logger.error(f"Error serving image {image_path}: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
-    # Initialize RAG service
-    # Look for config.yaml in project root (2 levels up from this file)
     default_config = Path(__file__).parent.parent.parent / 'config.yaml'
     config_path = os.getenv('CONFIG_PATH', str(default_config))
     init_rag_service(config_path)
     
-    # Run Flask app
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 8000))
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
     logger.info(f"Starting Flask server on port {port}")

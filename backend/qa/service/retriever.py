@@ -15,12 +15,7 @@ class ChromaDBRetriever:
     """Retriever for querying ChromaDB vector database."""
     
     def __init__(self, config: ChromaDBConfig):
-        """
-        Initialize ChromaDB retriever.
-        
-        Args:
-            config: ChromaDB configuration
-        """
+        """Initialize ChromaDB retriever."""
         self.config = config
         self.collection = self._initialize_collection()
     
@@ -33,16 +28,33 @@ class ChromaDBRetriever:
             database=self.config.database
         )
         
-        # Create embedding function
         embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name=self.config.embedding_model
         )
         
-        # Get collection
-        collection = client.get_collection(
-            name=self.config.collection_name,
-            embedding_function=embedding_fn
-        )
+        try:
+            collection = client.get_or_create_collection(
+                name=self.config.collection_name,
+                embedding_function=embedding_fn,
+                metadata={"embedding_model": self.config.embedding_model}
+            )
+        except Exception as e:
+            if "soft deleted" in str(e).lower() or "not found" in str(e).lower():
+                logger.warning(f"Collection '{self.config.collection_name}' appears to be soft-deleted. Attempting to recreate...")
+                try:
+                    client.delete_collection(name=self.config.collection_name)
+                    logger.info(f"Deleted soft-deleted collection '{self.config.collection_name}'")
+                except Exception as delete_error:
+                    logger.warning(f"Could not delete soft-deleted collection: {delete_error}")
+                
+                collection = client.create_collection(
+                    name=self.config.collection_name,
+                    embedding_function=embedding_fn,
+                    metadata={"embedding_model": self.config.embedding_model}
+                )
+                logger.info(f"Created new collection '{self.config.collection_name}'")
+            else:
+                raise
         
         doc_count = collection.count()
         logger.info(
@@ -58,30 +70,17 @@ class ChromaDBRetriever:
         top_k: int = 20,
         filters: Optional[Dict[str, Any]] = None
     ) -> List[Chunk]:
-        """
-        Retrieve relevant chunks from ChromaDB.
-        
-        Args:
-            query: Query text
-            top_k: Number of chunks to retrieve
-            filters: Metadata filters (e.g., {"ticker": "AAPL", "year": "2023"})
-            
-        Returns:
-            List of retrieved chunks
-        """
-        # Build where clause for filtering
-        # ChromaDB requires $and operator when multiple filters are present
+        """Retrieve relevant chunks from ChromaDB."""
         where_clause = None
         if filters:
-            filter_items = list(filters.items())
+            filtered_filters = {k: v for k, v in filters.items() if k != 'filing_type'}
+            filter_items = list(filtered_filters.items())
             if len(filter_items) == 0:
                 where_clause = None
             elif len(filter_items) == 1:
-                # Single filter: use directly
                 key, value = filter_items[0]
                 where_clause = {key: value}
             else:
-                # Multiple filters: use $and operator
                 where_clause = {
                     "$and": [
                         {key: value}
@@ -89,14 +88,25 @@ class ChromaDBRetriever:
                     ]
                 }
         
-        # Query ChromaDB
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_clause if where_clause else None
-        )
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=top_k,
+                where=where_clause if where_clause else None
+            )
+        except Exception as e:
+            error_str = str(e).lower()
+            if "soft deleted" in error_str or "not found" in error_str:
+                logger.warning(f"Collection appears to be soft-deleted during query. Reinitializing...")
+                self.collection = self._initialize_collection()
+                results = self.collection.query(
+                    query_texts=[query],
+                    n_results=top_k,
+                    where=where_clause if where_clause else None
+                )
+            else:
+                raise
         
-        # Format results into Chunk objects
         chunks = []
         if results.get('documents') and len(results['documents']) > 0:
             documents = results['documents'][0]
@@ -108,7 +118,7 @@ class ChromaDBRetriever:
                 chunks.append(Chunk(
                     text=doc,
                     metadata=metadata or {},
-                    score=1.0 - distance,  # Convert distance to similarity score
+                    score=1.0 - distance,
                     chunk_id=chunk_id
                 ))
         
@@ -116,12 +126,7 @@ class ChromaDBRetriever:
         return chunks
     
     def get_collection_info(self) -> Dict[str, Any]:
-        """
-        Get information about the ChromaDB collection.
-        
-        Returns:
-            Dictionary with collection information
-        """
+        """Get information about the ChromaDB collection."""
         count = self.collection.count()
         return {
             "collection_name": self.config.collection_name,

@@ -40,7 +40,6 @@
             <label for="year">Year:</label>
             <select id="year" v-model="filters.year" :disabled="auto_determine_filters">
               <option value="">All Years</option>
-              <option value="2022">2022</option>
               <option value="2023">2023</option>
               <option value="2024">2024</option>
             </select>
@@ -148,7 +147,6 @@ export default {
         }
       }
 
-      // Add top_k if specified
       if (this.top_k) {
         payload.top_k = this.top_k
       }

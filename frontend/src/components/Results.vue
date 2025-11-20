@@ -56,7 +56,6 @@
       <div class="answer-content" ref="answerContent" v-html="formattedAnswer"></div>
     </div>
     
-    <!-- Custom Tooltip -->
     <div 
       v-if="tooltip.visible" 
       class="custom-tooltip"
@@ -91,6 +90,19 @@
               <span class="expand-icon" :class="{ 'expanded': isExpanded(index) }">▼</span>
             </button>
           </div>
+          <div class="source-details">
+            <small>Chunk ID: {{ source.chunk_id }}</small>
+            <small v-if="source.chunk_type !== 'Text'"> | Type: {{ source.chunk_type }}</small>
+            <small v-if="source.page"> | Page: {{ source.page }}</small>
+          </div>
+          <div v-if="source.image_path" class="source-image-container">
+            <img 
+              :src="getImageUrl(source.image_path)" 
+              :alt="`${source.chunk_type} from ${source.ticker} ${source.year}`"
+              class="source-image"
+              @error="handleImageError"
+            />
+          </div>
           <div 
             v-if="source.text && isExpanded(index)" 
             class="source-text-content"
@@ -122,7 +134,8 @@ export default {
       },
       expandedSources: new Set(),  // Track which sources are expanded
       showReasoning: true,  // Show reasoning by default
-      showFilterReasoning: true  // Show filter reasoning by default
+      showFilterReasoning: true,  // Show filter reasoning by default
+      apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000'
     }
   },
   computed: {
@@ -168,12 +181,9 @@ export default {
       let lastIndex = 0
       let match
       
-      // Reset regex for iteration
       sourceTagRegex.lastIndex = 0
       
-      // Process each match and build parts array
       while ((match = sourceTagRegex.exec(formatted)) !== null) {
-        // Add text before the match (escape it)
         if (match.index > lastIndex) {
           parts.push({
             type: 'text',
@@ -181,7 +191,6 @@ export default {
           })
         }
         
-        // Extract attributes from the source tag
         const attrs = {}
         const attrRegex = /(\w+)="([^"]+)"/g
         let attrMatch
@@ -189,17 +198,15 @@ export default {
           attrs[attrMatch[1]] = attrMatch[2]
         }
         
-        // Add the highlighted span part
         parts.push({
           type: 'highlight',
-          content: match[2], // The text inside the tag
+          content: match[2],
           attrs: attrs
         })
         
         lastIndex = sourceTagRegex.lastIndex
       }
       
-      // Add remaining text after last match
       if (lastIndex < formatted.length) {
         parts.push({
           type: 'text',
@@ -207,7 +214,6 @@ export default {
         })
       }
       
-      // Build HTML string from parts
       return parts.map(part => {
         if (part.type === 'highlight') {
           const attrs = part.attrs
@@ -260,6 +266,17 @@ export default {
     },
     toggleFilterReasoning() {
       this.showFilterReasoning = !this.showFilterReasoning
+    },
+    getImageUrl(imagePath) {
+      if (!imagePath) return ''
+      // Construct the full URL to the backend image endpoint
+      // image_path should be relative to project root (e.g., "data/images/table_123.png")
+      return `${this.apiUrl}/images/${encodeURIComponent(imagePath)}`
+    },
+    handleImageError(event) {
+      // Hide the image on error
+      event.target.style.display = 'none'
+      console.warn('Failed to load image:', event.target.src)
     },
     attachTooltipListeners() {
       if (!this.$refs.answerContent) return
