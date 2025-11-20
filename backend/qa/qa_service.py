@@ -137,6 +137,109 @@ def retrieve():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/retrieve/rerank', methods=['POST'])
+def retrieve_with_rerank():
+    """Retrieve chunks with reranking: initially retrieve 5*k, then narrow down to k after reranking."""
+    if rag_service is None:
+        return jsonify({"error": "RAG service not initialized"}), 500
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+        
+        query_text = data.get('query')
+        if not query_text:
+            return jsonify({"error": "Missing 'query' field in request"}), 400
+        
+        filters = data.get('filters')
+        top_k = data.get('top_k') or rag_service.config.top_k
+        
+        # Retrieve 5*k chunks initially
+        initial_k = 5 * top_k
+        chunks = rag_service.retrieve(query=query_text, filters=filters, top_k=initial_k)
+        logger.info(f"Retrieved {len(chunks)} chunks (5*{top_k}={initial_k}) for reranking")
+        
+        # Rerank and narrow down to k
+        chunks = rag_service.rerank_chunks(query=query_text, chunks=chunks, top_k=top_k)
+        logger.info(f"Reranked to {len(chunks)} chunks")
+        
+        chunks_dict = [
+            {
+                "text": chunk.text,
+                "metadata": chunk.metadata,
+                "score": chunk.score,
+                "chunk_id": chunk.chunk_id
+            }
+            for chunk in chunks
+        ]
+        
+        return jsonify({
+            "chunks": chunks_dict,
+            "num_chunks": len(chunks),
+            "initial_retrieved": initial_k
+        })
+    
+    except Exception as e:
+        logger.error(f"Error retrieving chunks with reranking: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/retrieve/filter-rerank', methods=['POST'])
+def retrieve_with_filter_rerank():
+    """Retrieve chunks with filter reasoning and reranking: determine filters, retrieve 5*k, then narrow down to k after reranking."""
+    if rag_service is None:
+        return jsonify({"error": "RAG service not initialized"}), 500
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+        
+        query_text = data.get('query')
+        if not query_text:
+            return jsonify({"error": "Missing 'query' field in request"}), 400
+        
+        top_k = data.get('top_k') or rag_service.config.top_k
+        
+        # Determine filters using filter reasoning
+        filters, filter_reasoning = rag_service.determine_filters(query_text)
+        logger.info(f"Auto-determined filters: {filters}, reasoning: {filter_reasoning}")
+        
+        # Retrieve 5*k chunks initially with determined filters
+        initial_k = 5 * top_k
+        chunks = rag_service.retrieve(query=query_text, filters=filters, top_k=initial_k)
+        logger.info(f"Retrieved {len(chunks)} chunks (5*{top_k}={initial_k}) with filters for reranking")
+        
+        # Rerank and narrow down to k
+        chunks = rag_service.rerank_chunks(query=query_text, chunks=chunks, top_k=top_k)
+        logger.info(f"Reranked to {len(chunks)} chunks")
+        
+        chunks_dict = [
+            {
+                "text": chunk.text,
+                "metadata": chunk.metadata,
+                "score": chunk.score,
+                "chunk_id": chunk.chunk_id
+            }
+            for chunk in chunks
+        ]
+        
+        response = {
+            "chunks": chunks_dict,
+            "num_chunks": len(chunks),
+            "initial_retrieved": initial_k,
+            "applied_filters": filters,
+            "filter_reasoning": filter_reasoning
+        }
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving chunks with filter reasoning and reranking: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/collection/info', methods=['GET'])
 def collection_info():
     """Get information about the ChromaDB collection."""
