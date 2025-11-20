@@ -12,10 +12,12 @@ Usage:
 	--base-url http://localhost:5001
 
 Notes:
-  - This script calls two endpoints of the QA service:
-	  POST /query     ==> gets model answer + sources
-	  POST /retrieve  ==> gets retrieved chunks only (debug)
-  - It then compares:
+  - This script calls the QA service endpoints:
+	  POST /query                  ==> gets model answer + sources
+	  POST /retrieve               ==> baseline retrieve (no rerank)
+	  POST /retrieve/rerank        ==> retrieve with reranking
+	  POST /retrieve/filter-rerank ==> retrieve with filter reasoning + reranking
+  - It then compares (per retrieval method):
 	  (a) model answer vs. gold answer (token overlap)
 	  (b) retrieved chunks vs. gold reference text (token overlap)
   - No external NLP deps required; overlap is a simple Jaccard metric over tokens.
@@ -214,7 +216,7 @@ def _extract_retrieved_chunk_ids(retrieve_data: Dict[str, Any]) -> List[str]:
 	return ids
 
 
-def main(csv_path: str, row: int, base_url: str, top_k: int, filters: Optional[str], metric_threshold: float) -> None:
+def main(csv_path: str, row: int, base_url: str, top_k: int, filters: Optional[str], metric_threshold: float, call_sleep: float) -> None:
 	sample = load_sample(csv_path, row)
 	print(f"Loaded sample {_short(sample.qid)}: {sample.question}")
 
@@ -238,15 +240,34 @@ def main(csv_path: str, row: int, base_url: str, top_k: int, filters: Optional[s
 		"filters": filters_obj,
 	}
 
-	# 1) Retrieve chunks-only (debug)
-	retrieve_url = f"{base_url.rstrip('/')}/retrieve"
-	print(f"\nPOST {retrieve_url}\nBody: {json.dumps({k:v for k,v in payload.items() if v is not None})}")
-	try:
-		rc, retrieve_data = post_json(retrieve_url, payload)
-		print(f"Status: {rc}")
-	except requests.exceptions.RequestException as e:
-		print(f"Retrieve request failed: {e}")
-		retrieve_data = {}
+	# 1) Retrieve chunks-only from all three retrieval endpoints
+	base = base_url.rstrip("/")
+	endpoints = [
+		("baseline", f"{base}/retrieve", {**payload}),
+		("rerank", f"{base}/retrieve/rerank", {**payload}),
+		("filter_rerank", f"{base}/retrieve/filter-rerank", {**payload}),
+	]
+
+	retrieve_responses: Dict[str, Dict[str, Any]] = {}
+	retrieved_ids_by_method: Dict[str, List[str]] = {}
+
+	for idx_ep, (method_name, url, pl) in enumerate(endpoints):
+		print(f"\nPOST {url}  [{method_name}]\nBody: {json.dumps({k:v for k,v in pl.items() if v is not None})}")
+		try:
+			rc, retrieve_data = post_json(url, pl)
+			print(f"Status: {rc}")
+		except requests.exceptions.RequestException as e:
+			print(f"{method_name} retrieve request failed: {e}")
+			retrieve_data = {}
+
+		retrieve_responses[method_name] = retrieve_data or {}
+		retrieved_ids_by_method[method_name] = _extract_retrieved_chunk_ids(retrieve_data or {})
+
+		if call_sleep > 0 and (idx_ep + 1) < len(endpoints):
+			time.sleep(call_sleep)
+
+	if call_sleep > 0:
+		time.sleep(call_sleep)
 
 	# 2) Full query (LLM answer)
 	query_url = f"{base_url.rstrip('/')}/query"
@@ -270,39 +291,39 @@ def main(csv_path: str, row: int, base_url: str, top_k: int, filters: Optional[s
 		ans_sim = jaccard(sample.gold_answer, model_answer)
 		print(f"\nAnswer Jaccard similarity: {ans_sim:.3f}")
 
-	# Compare retrieved chunks using IDs (primary) and text (fallback)
-	retrieved_ids = _extract_retrieved_chunk_ids(retrieve_data or {})
-	# Back-compat: also collect texts if present, for optional text-based metrics
-	chunks_any = []
-	for key in ("chunks", "results", "retrieved", "matches", "documents"):
-		if isinstance((retrieve_data or {}).get(key), list):
-			chunks_any = (retrieve_data or {}).get(key) or []
-			break
-	retrieved_texts = [str(c.get("text", "")) for c in chunks_any if isinstance(c, dict)]
-
 	print("\n=== GOLD CHUNK IDS (subset) ===")
 	print(sample.gold_chunk_ids[:10])
 
-	print("\n=== RETRIEVED CHUNK IDS (subset) ===")
-	print(retrieved_ids[:10])
+	# Compare retrieved chunks using IDs (primary) and text (fallback) per method
+	for method_name, retrieved_ids in retrieved_ids_by_method.items():
+		print(f"\n=== {method_name.upper()} RETRIEVED CHUNK IDS (subset) ===")
+		print(retrieved_ids[:10])
 
-	# ID-based retrieval metrics
-	if retrieved_ids:
-		k_eff = min(top_k, len(retrieved_ids))
-		print(f"\n=== RETRIEVAL METRICS (IDs, k={k_eff}) ===")
-		hit = hit_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
-		prec = precision_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
-		rec = recall_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
-		mrr = mrr_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
-		ndcg = ndcg_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
-		print(f"hit@{k_eff}: {hit:.3f} | precision@{k_eff}: {prec:.3f} | recall@{k_eff}: {rec:.3f} | mrr@{k_eff}: {mrr:.3f} | nDCG@{k_eff}: {ndcg:.3f}")
-	else:
-		print("\n(No ID-based metrics: no retrieved chunk IDs found in response.)")
+		# ID-based retrieval metrics
+		if retrieved_ids:
+			k_eff = min(top_k, len(retrieved_ids))
+			print(f"\n=== {method_name.upper()} RETRIEVAL METRICS (IDs, k={k_eff}) ===")
+			hit = hit_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
+			prec = precision_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
+			rec = recall_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
+			mrr = mrr_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
+			ndcg = ndcg_at_k(retrieved_ids, set(sample.gold_chunk_ids), k_eff)
+			print(f"hit@{k_eff}: {hit:.3f} | precision@{k_eff}: {prec:.3f} | recall@{k_eff}: {rec:.3f} | mrr@{k_eff}: {mrr:.3f} | nDCG@{k_eff}: {ndcg:.3f}")
+		else:
+			print(f"\n(No ID-based metrics for {method_name}: no retrieved chunk IDs found in response.)")
 
-	# Optional: text-based metrics as a fallback diagnostic
+	# Optional: text-based metrics as a fallback diagnostic (baseline only)
+	baseline_resp = retrieve_responses.get("baseline") or {}
+	chunks_any: List[Dict[str, Any]] = []
+	for key in ("chunks", "results", "retrieved", "matches", "documents"):
+		if isinstance(baseline_resp.get(key), list):
+			chunks_any = baseline_resp.get(key) or []
+			break
+	retrieved_texts = [str(c.get("text", "")) for c in chunks_any if isinstance(c, dict)]
+
 	if retrieved_texts and sample.gold_references:
 		k_text = min(top_k, len(retrieved_texts))
-		print("\n=== RETRIEVAL METRICS (text fallback, threshold={:.2f}, k={}) ===".format(metric_threshold, k_text))
+		print("\n=== BASELINE RETRIEVAL METRICS (text fallback, threshold={:.2f}, k={}) ===".format(metric_threshold, k_text))
 		hit_t = text_hit_at_k(retrieved_texts, sample.gold_references, k_text, threshold=metric_threshold)
 		prec_t = text_precision_at_k(retrieved_texts, sample.gold_references, k_text, threshold=metric_threshold)
 		rec_t = text_recall_at_k(retrieved_texts, sample.gold_references, k_text, threshold=metric_threshold)
@@ -349,10 +370,16 @@ if __name__ == "__main__":
 		default=0.2,
 		help="Similarity threshold for text-based matching fallback (default: 0.2)",
 	)
+	parser.add_argument(
+		"--call-sleep",
+		type=float,
+		default=0.5,
+		help="Seconds to sleep between service calls (default: 0.5)",
+	)
 	args = parser.parse_args()
 
 	try:
-		main(args.csv, args.row, args.base_url, args.top_k, args.filters, args.metric_threshold)
+		main(args.csv, args.row, args.base_url, args.top_k, args.filters, args.metric_threshold, args.call_sleep)
 	except KeyboardInterrupt:
 		sys.exit(130)
 	except Exception as e:

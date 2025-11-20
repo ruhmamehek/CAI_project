@@ -3,12 +3,16 @@ Batch evaluator for retrieval quality using chunk IDs.
 
 For each eligible row in a FinDER CSV, it:
 - loads the question and gold chunk IDs
-- calls the QA service /retrieve (and /query for answer, optional)
-- extracts retrieved chunk IDs from the response
-- computes ID-based metrics: hit@k, precision@k, recall@k, mrr@k, nDCG@k
+- calls all QA service retrieve endpoints:
+  * /retrieve (baseline)
+  * /retrieve/filter (filter reasoning only, no rerank)
+  * /retrieve/rerank (with reranking)
+  * /retrieve/filter-rerank (with filter reasoning and reranking)
+- extracts retrieved chunk IDs from each response
+- computes ID-based metrics: hit@k, precision@k, recall@k, mrr@k, nDCG@k for each method
 - skips rows with empty gold chunk IDs
 
-Outputs per-row metrics and aggregates (macro means; micro precision/recall).
+Outputs per-row metrics and aggregates (macro means; micro precision/recall) for all three methods.
 
 Usage (from repo root):
   PYTHONPATH=$(pwd) python evaluation/eval_retrieval_batch.py \
@@ -18,6 +22,16 @@ Usage (from repo root):
     --start 0 --limit 50 \
     --output-csv evaluation/batch_metrics.csv \
     --output-json evaluation/batch_summary.json
+
+Example with k values 5, 10, 15, 20, 25:
+  PYTHONPATH=$(pwd) python evaluation/eval_retrieval_batch.py \
+    --csv "/path/to/finder.csv" \
+    --base-url http://localhost:8000 \
+    --k-list "5,10,15,20,25" \
+    --start 0 --limit 50 \
+    --output-csv evaluation/batch_metrics.csv \
+    --output-json evaluation/batch_summary.json \
+    --augment-csv evaluation/augmented_results.csv
 """
 from __future__ import annotations
 
@@ -158,6 +172,7 @@ def evaluate_rows(
     limit: Optional[int],
     filters: Optional[str],
     sleep: float,
+    call_sleep: float,
 ) -> Dict[str, Any]:
     df = pd.read_csv(csv_path)
     gold_col = _find_gold_ids_column(df)
@@ -187,9 +202,10 @@ def evaluate_rows(
 
     max_k = max(ks) if ks else top_k
 
-    # Micro aggregation counters per k
-    tp_sum: Dict[int, int] = {k: 0 for k in ks}
-    denom_precision: Dict[int, int] = {k: 0 for k in ks}  # add k per processed query
+    # Micro aggregation counters per k for each method
+    methods = ["baseline", "filter", "rerank", "filter_rerank"]
+    tp_sum: Dict[str, Dict[int, int]] = {method: {k: 0 for k in ks} for method in methods}
+    denom_precision: Dict[str, Dict[int, int]] = {method: {k: 0 for k in ks} for method in methods}
     total_relevant = 0  # denominator for micro recall is independent of k
 
     while i < rows_total and (limit is None or processed < limit):
@@ -198,53 +214,90 @@ def evaluate_rows(
             i += 1
             continue  # skip empty gold ids
 
-        # Retrieve once with the maximum required top_k to support all ks
-        payload = {"query": row.question, "top_k": max_k, "filters": filters_obj}
-        retrieve_url = f"{base_url.rstrip('/')}/retrieve"
-        try:
-            rc, retrieve_data = post_json(retrieve_url, payload)
-        except requests.exceptions.RequestException as e:
-            print(f"Row {i} request failed: {e}")
-            i += 1
-            continue
-        if rc != 200:
-            print(f"Row {i} retrieve HTTP {rc}, skipping")
-            i += 1
-            continue
-
-        retrieved_ids = _extract_retrieved_chunk_ids(retrieve_data or {})
-        if not retrieved_ids:
-            print(f"Row {i} no retrieved IDs; skipping")
-            i += 1
-            continue
-
         gold_set = set(row.gold_chunk_ids)
-
-        # counts for micro aggregation per k
-        for k in ks:
-            k_eff = min(k, len(retrieved_ids))
-            tp_k = sum(1 for rid in retrieved_ids[:k_eff] if rid in gold_set)
-            tp_sum[k] += tp_k
-            denom_precision[k] += k  # use requested k as denominator per our convention
         total_relevant += len(gold_set)
 
-        # metrics for each k
+        # Base payload
+        base_payload = {"query": row.question, "top_k": max_k}
+        
+        # Call all three endpoints
+        base = base_url.rstrip('/')
+        endpoints = [
+            ("baseline", f"{base}/retrieve", {**base_payload, "filters": filters_obj}),
+            ("filter", f"{base}/retrieve/filter", {**base_payload}),
+            ("rerank", f"{base}/retrieve/rerank", {**base_payload, "filters": filters_obj}),
+            ("filter_rerank", f"{base}/retrieve/filter-rerank", {**base_payload}),
+        ]
+        
+        retrieved_results: Dict[str, List[str]] = {}
+        
+        for idx_ep, (method_name, url, payload) in enumerate(endpoints):
+            try:
+                rc, retrieve_data = post_json(url, payload)
+                if rc != 200:
+                    print(f"Row {i} {method_name} HTTP {rc}, skipping this method")
+                    retrieved_results[method_name] = []
+                    continue
+                
+                retrieved_ids = _extract_retrieved_chunk_ids(retrieve_data or {})
+                retrieved_results[method_name] = retrieved_ids
+                
+            except requests.exceptions.RequestException as e:
+                print(f"Row {i} {method_name} request failed: {e}")
+                retrieved_results[method_name] = []
+                continue
+
+            if call_sleep > 0 and (idx_ep + 1) < len(endpoints):
+                time.sleep(call_sleep)
+
+        if call_sleep > 0:
+            time.sleep(call_sleep)
+
+        # Skip if all methods failed
+        if not any(retrieved_results.values()):
+            print(f"Row {i} all methods failed; skipping")
+            i += 1
+            continue
+
+        # Compute metrics for each method
         row_metrics: Dict[str, Any] = {
             "row_index": i,
             "qid": row.qid,
             "gold_count": len(gold_set),
-            "retrieved_count": len(retrieved_ids),
-            # Store the full retrieved list (up to max_k) for transparency
-            "retrieved_chunk_ids": retrieved_ids[:max_k],
             "gold_chunk_ids": row.gold_chunk_ids,
         }
-        for k in ks:
-            k_eff = min(k, len(retrieved_ids))
-            row_metrics[f"hit@{k}"] = hit_at_k(retrieved_ids, gold_set, k)
-            row_metrics[f"precision@{k}"] = precision_at_k(retrieved_ids, gold_set, k)
-            row_metrics[f"recall@{k}"] = recall_at_k(retrieved_ids, gold_set, k)
-            row_metrics[f"mrr@{k}"] = mrr_at_k(retrieved_ids, gold_set, k)
-            row_metrics[f"ndcg@{k}"] = ndcg_at_k(retrieved_ids, gold_set, k)
+        
+        for method_name, retrieved_ids in retrieved_results.items():
+            if not retrieved_ids:
+                # Set all metrics to 0/None for failed methods
+                row_metrics[f"{method_name}_retrieved_count"] = 0
+                row_metrics[f"{method_name}_retrieved_chunk_ids"] = []
+                for k in ks:
+                    row_metrics[f"{method_name}_hit@{k}"] = 0.0
+                    row_metrics[f"{method_name}_precision@{k}"] = 0.0
+                    row_metrics[f"{method_name}_recall@{k}"] = 0.0
+                    row_metrics[f"{method_name}_mrr@{k}"] = 0.0
+                    row_metrics[f"{method_name}_ndcg@{k}"] = 0.0
+                continue
+            
+            row_metrics[f"{method_name}_retrieved_count"] = len(retrieved_ids)
+            row_metrics[f"{method_name}_retrieved_chunk_ids"] = retrieved_ids[:max_k]
+            
+            # counts for micro aggregation per k
+            for k in ks:
+                k_eff = min(k, len(retrieved_ids))
+                tp_k = sum(1 for rid in retrieved_ids[:k_eff] if rid in gold_set)
+                tp_sum[method_name][k] += tp_k
+                denom_precision[method_name][k] += k  # use requested k as denominator per our convention
+            
+            # metrics for each k
+            for k in ks:
+                row_metrics[f"{method_name}_hit@{k}"] = hit_at_k(retrieved_ids, gold_set, k)
+                row_metrics[f"{method_name}_precision@{k}"] = precision_at_k(retrieved_ids, gold_set, k)
+                row_metrics[f"{method_name}_recall@{k}"] = recall_at_k(retrieved_ids, gold_set, k)
+                row_metrics[f"{method_name}_mrr@{k}"] = mrr_at_k(retrieved_ids, gold_set, k)
+                row_metrics[f"{method_name}_ndcg@{k}"] = ndcg_at_k(retrieved_ids, gold_set, k)
+        
         per_row.append(row_metrics)
 
         processed += 1
@@ -262,34 +315,39 @@ def evaluate_rows(
             "micro": {},
         }
 
-    # Macro averages (mean across rows) for each k
-    macro: Dict[str, Dict[str, float]] = {}
-    for k in ks:
-        def _mean_k(key: str) -> float:
-            vals = [r.get(f"{key}@{k}", 0.0) for r in per_row]
-            return float(sum(vals)) / float(len(vals)) if vals else 0.0
-        macro[str(k)] = {
-            "hit": _mean_k("hit"),
-            "precision": _mean_k("precision"),
-            "recall": _mean_k("recall"),
-            "mrr": _mean_k("mrr"),
-            "ndcg": _mean_k("ndcg"),
-        }
+    # Macro averages (mean across rows) for each k and each method
+    macro: Dict[str, Dict[str, Dict[str, float]]] = {}
+    for method_name in methods:
+        macro[method_name] = {}
+        for k in ks:
+            def _mean_k(key: str) -> float:
+                vals = [r.get(f"{method_name}_{key}@{k}", 0.0) for r in per_row]
+                return float(sum(vals)) / float(len(vals)) if vals else 0.0
+            macro[method_name][str(k)] = {
+                "hit": _mean_k("hit"),
+                "precision": _mean_k("precision"),
+                "recall": _mean_k("recall"),
+                "mrr": _mean_k("mrr"),
+                "ndcg": _mean_k("ndcg"),
+            }
 
-    # Micro precision/recall per k
-    micro: Dict[str, Dict[str, float]] = {}
-    for k in ks:
-        micro_precision_k = (tp_sum[k] / float(denom_precision[k])) if denom_precision[k] > 0 else 0.0
-        micro_recall_k = (tp_sum[k] / float(total_relevant)) if total_relevant > 0 else 0.0
-        micro[str(k)] = {
-            "precision": micro_precision_k,
-            "recall": micro_recall_k,
-        }
+    # Micro precision/recall per k for each method
+    micro: Dict[str, Dict[str, Dict[str, float]]] = {}
+    for method_name in methods:
+        micro[method_name] = {}
+        for k in ks:
+            micro_precision_k = (tp_sum[method_name][k] / float(denom_precision[method_name][k])) if denom_precision[method_name][k] > 0 else 0.0
+            micro_recall_k = (tp_sum[method_name][k] / float(total_relevant)) if total_relevant > 0 else 0.0
+            micro[method_name][str(k)] = {
+                "precision": micro_precision_k,
+                "recall": micro_recall_k,
+            }
 
     return {
         "count": len(per_row),
         "per_row": per_row,
         "ks": ks,
+        "methods": methods,
         "macro": macro,
         "micro": micro,
     }
@@ -298,13 +356,14 @@ def evaluate_rows(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Batch retrieval evaluator using chunk IDs.")
     parser.add_argument("--csv", type=str, required=True, help="Path to the FinDER CSV file.")
-    parser.add_argument("--base-url", type=str, default="http://localhost:5001", help="QA service base URL.")
+    parser.add_argument("--base-url", type=str, default="http://localhost:8000", help="QA service base URL.")
     parser.add_argument("--top-k", type=int, default=10, help="Top-K for retrieval (used when --k-list is not provided).")
     parser.add_argument("--k-list", type=str, default=None, help="Comma-separated list of k values for @k metrics, e.g. '5,10,20'. Retrieval is done once with max(k).")
     parser.add_argument("--start", type=int, default=0, help="Start row index (inclusive).")
     parser.add_argument("--limit", type=int, default=50, help="Maximum number of rows to evaluate (skipping empties).")
     parser.add_argument("--filters", type=str, default=None, help="Optional JSON string for filters.")
-    parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to sleep between requests.")
+    parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to sleep between rows.")
+    parser.add_argument("--call-sleep", type=float, default=0.5, help="Seconds to sleep between service calls (default: 0.5).")
     parser.add_argument("--output-csv", type=str, default=None, help="Optional path to write per-row metrics CSV.")
     parser.add_argument("--output-json", type=str, default=None, help="Optional path to write summary JSON.")
     parser.add_argument("--augment-csv", type=str, default=None, help="Optional path to write the original CSV augmented with per-row metrics and retrieved IDs (new columns).")
@@ -331,6 +390,7 @@ def main() -> None:
             limit=args.limit,
             filters=args.filters,
             sleep=args.sleep,
+            call_sleep=args.call_sleep,
         )
     except KeyboardInterrupt:
         sys.exit(130)
@@ -357,15 +417,19 @@ def main() -> None:
             df = pd.read_csv(args.csv)
             # Ensure columns exist
             ks = result.get("ks", []) or []
-            new_cols = ["retrieved_count", "retrieved_chunk_ids", "gold_chunk_ids"]
-            for k in ks:
-                new_cols += [
-                    f"retrieval_hit@{k}",
-                    f"retrieval_precision@{k}",
-                    f"retrieval_recall@{k}",
-                    f"retrieval_mrr@{k}",
-                    f"retrieval_ndcg@{k}",
-                ]
+            methods = result.get("methods", ["baseline", "filter", "rerank", "filter_rerank"])
+            new_cols = ["gold_chunk_ids"]
+            for method_name in methods:
+                new_cols.append(f"{method_name}_retrieved_count")
+                new_cols.append(f"{method_name}_retrieved_chunk_ids")
+                for k in ks:
+                    new_cols += [
+                        f"{method_name}_retrieval_hit@{k}",
+                        f"{method_name}_retrieval_precision@{k}",
+                        f"{method_name}_retrieval_recall@{k}",
+                        f"{method_name}_retrieval_mrr@{k}",
+                        f"{method_name}_retrieval_ndcg@{k}",
+                    ]
             for c in new_cols:
                 if c not in df.columns:
                     df[c] = None
@@ -373,15 +437,17 @@ def main() -> None:
             for r in result.get("per_row", []):
                 idx = r["row_index"]
                 if 0 <= idx < len(df):
-                    df.at[idx, "retrieved_count"] = r.get("retrieved_count")
-                    for k in ks:
-                        df.at[idx, f"retrieval_hit@{k}"] = r.get(f"hit@{k}")
-                        df.at[idx, f"retrieval_precision@{k}"] = r.get(f"precision@{k}")
-                        df.at[idx, f"retrieval_recall@{k}"] = r.get(f"recall@{k}")
-                        df.at[idx, f"retrieval_mrr@{k}"] = r.get(f"mrr@{k}")
-                        df.at[idx, f"retrieval_ndcg@{k}"] = r.get(f"ndcg@{k}")
-                    # Store IDs as JSON strings to avoid delimiter ambiguity
-                    df.at[idx, "retrieved_chunk_ids"] = json.dumps(r.get("retrieved_chunk_ids", []))
+                    for method_name in methods:
+                        df.at[idx, f"{method_name}_retrieved_count"] = r.get(f"{method_name}_retrieved_count")
+                        for k in ks:
+                            df.at[idx, f"{method_name}_retrieval_hit@{k}"] = r.get(f"{method_name}_hit@{k}")
+                            df.at[idx, f"{method_name}_retrieval_precision@{k}"] = r.get(f"{method_name}_precision@{k}")
+                            df.at[idx, f"{method_name}_retrieval_recall@{k}"] = r.get(f"{method_name}_recall@{k}")
+                            df.at[idx, f"{method_name}_retrieval_mrr@{k}"] = r.get(f"{method_name}_mrr@{k}")
+                            df.at[idx, f"{method_name}_retrieval_ndcg@{k}"] = r.get(f"{method_name}_ndcg@{k}")
+                        # Store IDs as JSON strings to avoid delimiter ambiguity
+                        df.at[idx, f"{method_name}_retrieved_chunk_ids"] = json.dumps(r.get(f"{method_name}_retrieved_chunk_ids", []))
+                    # Store gold IDs as JSON string
                     df.at[idx, "gold_chunk_ids"] = json.dumps(r.get("gold_chunk_ids", []))
             df.to_csv(args.augment_csv, index=False)
             print(f"Wrote augmented CSV to {args.augment_csv}")

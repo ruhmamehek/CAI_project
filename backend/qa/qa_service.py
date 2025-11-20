@@ -156,7 +156,7 @@ def retrieve_with_rerank():
         top_k = data.get('top_k') or rag_service.config.top_k
         
         # Retrieve 5*k chunks initially
-        initial_k = 5 * top_k
+        initial_k = 2 * top_k
         chunks = rag_service.retrieve(query=query_text, filters=filters, top_k=initial_k)
         logger.info(f"Retrieved {len(chunks)} chunks (5*{top_k}={initial_k}) for reranking")
         
@@ -237,6 +237,52 @@ def retrieve_with_filter_rerank():
     
     except Exception as e:
         logger.error(f"Error retrieving chunks with filter reasoning and reranking: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/retrieve/filter', methods=['POST'])
+def retrieve_with_filter_reasoning():
+    """Retrieve chunks with filter reasoning only (no reranking)."""
+    if rag_service is None:
+        return jsonify({"error": "RAG service not initialized"}), 500
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 400
+        
+        query_text = data.get('query')
+        if not query_text:
+            return jsonify({"error": "Missing 'query' field in request"}), 400
+        
+        top_k = data.get('top_k') or rag_service.config.top_k
+        
+        # Determine filters using filter reasoning
+        filters, filter_reasoning = rag_service.determine_filters(query_text)
+        logger.info(f"Auto-determined filters (no rerank): {filters}, reasoning: {filter_reasoning}")
+        
+        chunks = rag_service.retrieve(query=query_text, filters=filters, top_k=top_k)
+        logger.info(f"Retrieved {len(chunks)} chunks with filters (no rerank)")
+        
+        chunks_dict = [
+            {
+                "text": chunk.text,
+                "metadata": chunk.metadata,
+                "score": chunk.score,
+                "chunk_id": chunk.chunk_id
+            }
+            for chunk in chunks
+        ]
+        
+        return jsonify({
+            "chunks": chunks_dict,
+            "num_chunks": len(chunks),
+            "applied_filters": filters,
+            "filter_reasoning": filter_reasoning
+        })
+    
+    except Exception as e:
+        logger.error(f"Error retrieving chunks with filter reasoning: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 

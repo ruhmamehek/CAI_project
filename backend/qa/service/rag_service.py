@@ -1,10 +1,12 @@
 """RAG service for querying SEC filings."""
 
 import logging
+import os
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 import numpy as np
 from sentence_transformers import CrossEncoder, SentenceTransformer
+from huggingface_hub import snapshot_download
 
 from .retriever import ChromaDBRetriever
 from .llm_client import LLMClient, create_llm_client
@@ -39,12 +41,21 @@ class RAGService:
             return
         
         try:
-            cross_encoder_model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+            cross_encoder_repo = "FinanceMTEB/FiQA-reranking"
             max_length = self.config.rerank_max_length
-            
-            logger.info(f"Initializing reranking models (max_length={max_length})...")
+
+            logger.info(f"Downloading cross-encoder '{cross_encoder_repo}' from Hugging Face Hub...")
+            token = os.getenv("HUGGINGFACE_TOKEN")
+            local_model_path = snapshot_download(
+                repo_id=cross_encoder_repo,
+                token=token,
+                cache_dir=os.getenv("HF_HOME"),
+                allow_patterns=["*"],
+            )
+
+            logger.info(f"Initializing reranking model from {local_model_path} (max_length={max_length})...")
             self.cross_encoder = CrossEncoder(
-                cross_encoder_model,
+                local_model_path,
                 max_length=max_length,
                 device="cpu"
             )
